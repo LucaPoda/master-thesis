@@ -116,7 +116,7 @@ class GraphicEngine(ShowBase):
     def initialize_world_graphics(self, world_objects: dict):
         for obj_id, data in world_objects.items():
             center = data["center"]
-            hx, hy, hz = data["estensioni"]
+            hx, hy, hz = data["extensions"]
             color = data["color"]
             gray_val = sum(color[:3]) / 3.0
             

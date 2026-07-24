@@ -13,7 +13,7 @@ class WorldState:
         # Pre-compute the 8 vertices for the optical perception system
         for obj_id, data in self.objects.items():
             cx, cy, cz = data["center"]
-            hx, hy, hz = data["estensioni"]
+            hx, hy, hz = data["extensions"]
             data["vertices"] = [
                 np.array([cx + dx, cy + dy, cz + dz])
                 for dx in (-hx, hx)

@@ -1,3 +1,4 @@
+# perception_system.py
 import numpy as np
 from core_types import AgentState
 
@@ -9,59 +10,91 @@ class PerceptionSystem:
         self.tan_half_fov_h = np.tan(fov_h_rad / 2.0)
         self.tan_half_fov_v = np.tan(fov_v_rad / 2.0)
         
-        # Read the value of max_range (default to 0.0 if omitted)
         self.max_range = sensor_config.get("max_range", 0.0)
 
-    def _is_point_in_frustum(self, point: np.ndarray, agent_pos: np.ndarray, 
-                             agent_fwd: np.ndarray, agent_right: np.ndarray, agent_up: np.ndarray) -> bool:
-        vec_to_vertex = point - agent_pos
-        y_local = np.dot(vec_to_vertex, agent_fwd)
+    def _is_aabb_in_frustum(self, vertices: list, agent_pos: np.ndarray, 
+                            agent_fwd: np.ndarray, agent_right: np.ndarray, agent_up: np.ndarray) -> bool:
+        """
+        Esegue un Frustum Culling robusto valutando l'oggetto contro i piani della piramide.
+        Se tutti gli 8 vertici dell'AABB sono sul lato "sbagliato" di un singolo piano,
+        l'oggetto è matematicamente fuori dal campo visivo.
+        """
+        # Convertiamo tutti i vertici nello spazio locale della telecamera
+        local_vertices = []
+        for v in vertices:
+            vec = v - agent_pos
+            y = np.dot(vec, agent_fwd)   # Profondità (Avanti)
+            x = np.dot(vec, agent_right) # Asse Orizzontale (Destra/Sinistra)
+            z = np.dot(vec, agent_up)    # Asse Verticale (Alto/Basso)
+            local_vertices.append((x, y, z))
+
+        # Test 1: Piano Near (Tutti i vertici sono dietro la telecamera?)
+        if all(y <= 0 for x, y, z in local_vertices): return False
         
-        # The object must always be found rigorously in front
-        if y_local <= 0: 
-            return False
-            
-        # If max_range is set (> 0), we discard what is too far away
-        if self.max_range > 0 and y_local > self.max_range:
-            return False
-            
-        x_local = np.dot(vec_to_vertex, agent_right)
-        z_local = np.dot(vec_to_vertex, agent_up)
+        # Test 2: Piano Far (Tutti i vertici superano la distanza massima?)
+        if self.max_range > 0 and all(y > self.max_range for x, y, z in local_vertices): return False
+
+        # Test 3: Piano Destro (Tutti i vertici sono oltre il bordo destro?)
+        if all(x > y * self.tan_half_fov_h for x, y, z in local_vertices): return False
         
-        if abs(x_local / y_local) > self.tan_half_fov_h: return False
-        if abs(z_local / y_local) > self.tan_half_fov_v: return False
+        # Test 4: Piano Sinistro (Tutti i vertici sono oltre il bordo sinistro?)
+        if all(x < -y * self.tan_half_fov_h for x, y, z in local_vertices): return False
+
+        # Test 5: Piano Superiore (Tutti i vertici sono oltre il limite alto?)
+        if all(z > y * self.tan_half_fov_v for x, y, z in local_vertices): return False
+        
+        # Test 6: Piano Inferiore (Tutti i vertici sono sotto il limite basso?)
+        if all(z < -y * self.tan_half_fov_v for x, y, z in local_vertices): return False
+
+        # Se l'oggetto non è stato scartato da nessuno dei piani, allora attraversa l'inquadratura!
         return True
 
     def scan_environment(self, collision_queue, agent: AgentState, world_objects: dict) -> list:
-        # 1. BROAD-PHASE (Physical collision detection using Panda3D)
+        # 1. BROAD-PHASE (Fisica)
         nearby_objects = set()
         for i in range(collision_queue.getNumEntries()):
             hit_node = collision_queue.getEntry(i).getIntoNodePath()
             if hit_node.hasTag("obj_id"):
                 nearby_objects.add(hit_node.getTag("obj_id"))
 
-        # 2. NARROW-PHASE (Math)
+        # 2. NARROW-PHASE (Matematica)
         visible_objects = []
         if not nearby_objects:
             return visible_objects
             
         agent_pos = agent.position + np.array([0, 0, 2])
-        agent_fwd = agent.get_forward_vector()
         
+        # CORREZIONE PITCH: Calcoliamo il vero vettore tridimensionale 
+        # includendo l'inclinazione della telecamera (Pitch)
+        pitch_rad = np.radians(agent.pitch)
+        yaw_rad = np.radians(agent.yaw)
+        
+        fwd_x = -np.sin(yaw_rad) * np.cos(pitch_rad)
+        fwd_y = np.cos(yaw_rad) * np.cos(pitch_rad)
+        fwd_z = np.sin(pitch_rad)
+        
+        agent_fwd = np.array([fwd_x, fwd_y, fwd_z])
+        agent_fwd = agent_fwd / np.linalg.norm(agent_fwd)
+        
+        # Rigeneriamo gli assi Right e Up basandoci sul nuovo Forward inclinato
         global_up = np.array([0.0, 0.0, 1.0])
         agent_right = np.cross(agent_fwd, global_up)
-        if np.linalg.norm(agent_right) > 0:
+        
+        # Protezione matematica nel caso in cui stiamo guardando perfettamente verso l'alto/basso
+        if np.linalg.norm(agent_right) > 0.001:
             agent_right = agent_right / np.linalg.norm(agent_right)
+        else:
+            agent_right = np.array([1.0, 0.0, 0.0]) 
+            
         agent_up = np.cross(agent_right, agent_fwd)
+        agent_up = agent_up / np.linalg.norm(agent_up)
 
+        # Scansione Oggetti
         for obj_id in nearby_objects:
             obj_data = world_objects[obj_id]
-            # Directly use the vertices calculated at the construction of the WorldState
             vertices = obj_data["vertices"]
             
-            for vertex in vertices:
-                if self._is_point_in_frustum(vertex, agent_pos, agent_fwd, agent_right, agent_up):
-                    visible_objects.append(obj_id)
-                    break
+            if self._is_aabb_in_frustum(vertices, agent_pos, agent_fwd, agent_right, agent_up):
+                visible_objects.append(obj_id)
 
         return visible_objects

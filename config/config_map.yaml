@@ -1,15 +1,102 @@
-world_size: [50, 50, 1]
-ground_color: [0.2, 0.2, 0.2, 1.0]
-agent_start_pos: [0, 0, 1]
+world_size: [200, 200, 1]
+ground_color: [0.15, 0.15, 0.18, 1.0]
+agent_start_pos: [0.0, -40.0, 1.0]    
 agent_start_yaw: 0.0
 
 objects:
-  Muro_Nord:
-    center: [0.0, 10.0, 1.0]
-    estensioni: [5.0, 0.5, 2.0]
+  # ==========================================
+  # Perimetral Walls (Dark Blue)
+  # ==========================================
+  North_Wall:
+    center: [0.0, 50.0, 2.5]
+    extensions: [50.0, 1.0, 2.5]
+    color: [0.1, 0.4, 0.5, 1.0] 
+    
+  South_Wall:
+    center: [0.0, -50.0, 2.5]
+    extensions: [50.0, 1.0, 2.5]
+    color: [0.1, 0.4, 0.5, 1.0]
+    
+  East_Wall:
+    center: [50.0, 0.0, 2.5]
+    extensions: [1.0, 50.0, 2.5]
+    color: [0.1, 0.4, 0.5, 1.0]
+    
+  West_Wall:
+    center: [-50.0, 0.0, 2.5]
+    extensions: [1.0, 50.0, 2.5]
+    color: [0.1, 0.4, 0.5, 1.0]
+
+  # ==========================================
+  # Central Zone (Deep Purple)
+  # ==========================================
+  Monolite_Centrale:
+    center: [0.0, 0.0, 5.0]
+    extensions: [4.0, 4.0, 5.0]
+    color: [0.4, 0.1, 0.6, 1.0] 
+
+  # ==========================================
+  # COLONNADE AREA (Yellow Ochre / Gold)
+  # ==========================================
+  Column_1:
+    center: [15.0, -20.0, 3.0]
+    extensions: [0.5, 0.5, 3.0]
+    color: [0.8, 0.6, 0.1, 1.0]
+    
+  Column_2:
+    center: [15.0, -5.0, 3.0]
+    extensions: [0.5, 0.5, 3.0]
+    color: [0.8, 0.6, 0.1, 1.0]
+    
+  Column_3:
+    center: [15.0, 10.0, 3.0]
+    extensions: [0.5, 0.5, 3.0]
+    color: [0.8, 0.6, 0.1, 1.0]
+    
+  Column_4:
+    center: [15.0, 25.0, 3.0]
+    extensions: [0.5, 0.5, 3.0]
+    color: [0.8, 0.6, 0.1, 1.0]
+
+  # ==========================================
+  # CORRIDOR AREA AND DISPERSAL AREA
+  # ==========================================
+  Internal_Corridor_Wall:
+    center: [30.0, 0.0, 2.0]
+    extensions: [1.0, 35.0, 2.0]
+    color: [0.5, 0.2, 0.2, 1.0] 
+    
+  Corridor_Obstacle:
+    center: [40.0, 15.0, 1.0]
+    extensions: [2.0, 2.0, 1.0]
+    color: [1.0, 0.5, 0.0, 1.0] 
+
+  Red_Box:
+    center: [-20.0, 10.0, 1.5]
+    extensions: [2.0, 2.0, 1.5]
     color: [1.0, 0.0, 0.0, 1.0]
-  
-  Pilastro_Centrale:
-    center: [5.0, 5.0, 1.0]
-    estensioni: [1.0, 1.0, 3.0]
+    
+  Blue_Box_Long:
+    center: [-35.0, 25.0, 1.0]
+    extensions: [1.5, 6.0, 1.0]
+    color: [0.0, 0.0, 1.0, 1.0]
+    
+  Green_Platform:
+    center: [-15.0, 35.0, 0.2]
+    extensions: [5.0, 5.0, 0.2]
     color: [0.0, 1.0, 0.0, 1.0]
+    
+  Yellow_Pillar:
+    center: [-40.0, -10.0, 4.0]
+    extensions: [1.0, 1.0, 4.0]
+    color: [1.0, 1.0, 0.0, 1.0]
+    
+  Cyan_Box:
+    center: [-25.0, -25.0, 1.0]
+    extensions: [1.0, 1.0, 1.0]
+    color: [0.0, 1.0, 1.0, 1.0]
+    
+  Magenta_Box:
+    center: [-10.0, -15.0, 2.0]
+    extensions: [2.0, 2.0, 2.0]
+    color: [1.0, 0.0, 1.0, 1.0]
