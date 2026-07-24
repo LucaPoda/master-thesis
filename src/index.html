@@ -1,0 +1,144 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Semantic Graph Visualizer</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; background-color: #1e1e1e; color: #fff;}
+        #network-container { flex: 1; height: 100%; }
+        #sidebar { width: 350px; background: #2d2d30; padding: 20px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; z-index: 10;}
+        
+        .panel { background: #3e3e42; padding: 15px; border-radius: 8px; margin-bottom: 20px; min-height: 100px; display: none;}
+        h3 { margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 5px; }
+        
+        .object-square {
+            display: inline-block;
+            width: 35px; height: 35px;
+            line-height: 35px; text-align: center;
+            color: #fff; font-weight: bold; font-size: 12px;
+            margin: 3px; border-radius: 4px;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+        }
+        .diff-section { margin-top: 10px; }
+        .diff-title { font-size: 14px; margin-bottom: 5px; color: #aaa;}
+    </style>
+</head>
+<body>
+
+    <div id="network-container"></div>
+    
+    <div id="sidebar">
+        <h2>Dettagli Grafo</h2>
+        <div id="hover-panel" class="panel">
+            <h3 id="hover-title">Contenuto Nodo</h3>
+            <div id="hover-content">Passa il mouse su un nodo.</div>
+        </div>
+        
+        <div id="diff-panel" class="panel">
+            <h3 id="diff-title">Differenza Archi</h3>
+            <div class="diff-section">
+                <div class="diff-title" id="diff-side-a-title">Solo in A:</div>
+                <div id="diff-side-a"></div>
+            </div>
+            <div class="diff-section">
+                <div class="diff-title" id="diff-side-b-title">Solo in B:</div>
+                <div id="diff-side-b"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('network-container');
+        const nodes = new vis.DataSet([]);
+        const edges = new vis.DataSet([]);
+        
+        let globalData = { nodes: [], colors: {} };
+
+        const options = {
+            nodes: { shape: 'dot', size: 15, font: { size: 14, color: '#ffffff' } },
+            edges: { width: 2, color: { inherit: false, color: '#888' } },
+            interaction: { hover: true },
+            physics: { barnesHut: { springLength: 150 } }
+        };
+
+        const network = new vis.Network(container, { nodes, edges }, options);
+
+        // Helper per generare quadrati HTML
+        function generateSquare(objId) {
+            const color = globalData.colors[objId] || '#555';
+            return `<div class="object-square" style="background-color: ${color};">${objId}</div>`;
+        }
+
+        // Websocket Connection
+        const ws = new WebSocket(`ws://${location.host}/ws`);
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            globalData = data; // Salva in locale
+            
+            // Format Vis.js nodes
+            const visNodes = data.nodes.map(n => ({
+                id: n.id,
+                label: n.label,
+                borderWidth: n.is_current ? 4 : 1,
+                color: {
+                    border: n.is_current ? '#ff3b30' : '#2B7CE9',
+                    background: n.is_current ? '#ffb3b0' : '#97C2FC'
+                },
+                shadow: n.is_current
+            }));
+
+            nodes.update(visNodes); // Update or add
+            edges.update(data.edges);
+        };
+
+        // UI Interactions
+        network.on("hoverNode", function (params) {
+            const nodeId = params.node;
+            const nodeData = globalData.nodes.find(n => n.id === nodeId);
+            if (nodeData) {
+                document.getElementById('hover-panel').style.display = 'block';
+                document.getElementById('hover-title').innerText = nodeData.label;
+                const html = nodeData.objects.map(generateSquare).join('');
+                document.getElementById('hover-content').innerHTML = html || '<i>Nessun oggetto</i>';
+            }
+        });
+
+        network.on("blurNode", function () {
+            document.getElementById('hover-panel').style.display = 'none';
+        });
+
+        network.on("click", function (params) {
+            const diffPanel = document.getElementById('diff-panel');
+            
+            // Selezionato un arco (e nessun nodo sovrapposto)
+            if (params.edges.length === 1 && params.nodes.length === 0) {
+                const edgeId = params.edges[0];
+                const edge = globalData.edges.find(e => e.id === edgeId);
+                
+                const nodeA = globalData.nodes.find(n => n.id === edge.from);
+                const nodeB = globalData.nodes.find(n => n.id === edge.to);
+                
+                const setA = new Set(nodeA.objects);
+                const setB = new Set(nodeB.objects);
+                
+                const onlyInA = nodeA.objects.filter(x => !setB.has(x));
+                const onlyInB = nodeB.objects.filter(x => !setA.has(x));
+
+                document.getElementById('diff-side-a-title').innerText = `Solo in ${nodeA.label}:`;
+                document.getElementById('diff-side-a').innerHTML = onlyInA.map(generateSquare).join('') || '-';
+                
+                document.getElementById('diff-side-b-title').innerText = `Solo in ${nodeB.label}:`;
+                document.getElementById('diff-side-b').innerHTML = onlyInB.map(generateSquare).join('') || '-';
+                
+                diffPanel.style.display = 'block';
+            } else {
+                diffPanel.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

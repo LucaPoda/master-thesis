@@ -5,55 +5,55 @@ agent_start_yaw: 0.0
 
 objects:
   # ==========================================
-  # Perimetral Walls (Dark Blue)
+  # Perimeter Walls (Dark Blue)
   # ==========================================
-  North_Wall:
+  NW:
     center: [0.0, 50.0, 2.5]
     extensions: [50.0, 1.0, 2.5]
     color: [0.1, 0.4, 0.5, 1.0] 
     
-  South_Wall:
+  SW:
     center: [0.0, -50.0, 2.5]
     extensions: [50.0, 1.0, 2.5]
     color: [0.1, 0.4, 0.5, 1.0]
     
-  East_Wall:
+  EW:
     center: [50.0, 0.0, 2.5]
     extensions: [1.0, 50.0, 2.5]
     color: [0.1, 0.4, 0.5, 1.0]
     
-  West_Wall:
+  WW:
     center: [-50.0, 0.0, 2.5]
     extensions: [1.0, 50.0, 2.5]
     color: [0.1, 0.4, 0.5, 1.0]
 
   # ==========================================
-  # Central Zone (Deep Purple)
+  # Central Zone
   # ==========================================
-  Monolite_Centrale:
+  M1:
     center: [0.0, 0.0, 5.0]
     extensions: [4.0, 4.0, 5.0]
     color: [0.4, 0.1, 0.6, 1.0] 
 
   # ==========================================
-  # COLONNADE AREA (Yellow Ochre / Gold)
+  # COLONNADE AREA
   # ==========================================
-  Column_1:
+  C1:
     center: [15.0, -20.0, 3.0]
     extensions: [0.5, 0.5, 3.0]
     color: [0.8, 0.6, 0.1, 1.0]
     
-  Column_2:
+  C2:
     center: [15.0, -5.0, 3.0]
     extensions: [0.5, 0.5, 3.0]
     color: [0.8, 0.6, 0.1, 1.0]
     
-  Column_3:
+  C3:
     center: [15.0, 10.0, 3.0]
     extensions: [0.5, 0.5, 3.0]
     color: [0.8, 0.6, 0.1, 1.0]
     
-  Column_4:
+  C4:
     center: [15.0, 25.0, 3.0]
     extensions: [0.5, 0.5, 3.0]
     color: [0.8, 0.6, 0.1, 1.0]
@@ -61,42 +61,42 @@ objects:
   # ==========================================
   # CORRIDOR AREA AND DISPERSAL AREA
   # ==========================================
-  Internal_Corridor_Wall:
+  W5:
     center: [30.0, 0.0, 2.0]
     extensions: [1.0, 35.0, 2.0]
     color: [0.5, 0.2, 0.2, 1.0] 
     
-  Corridor_Obstacle:
+  O1:
     center: [40.0, 15.0, 1.0]
     extensions: [2.0, 2.0, 1.0]
     color: [1.0, 0.5, 0.0, 1.0] 
 
-  Red_Box:
+  B1:
     center: [-20.0, 10.0, 1.5]
     extensions: [2.0, 2.0, 1.5]
     color: [1.0, 0.0, 0.0, 1.0]
     
-  Blue_Box_Long:
+  B2:
     center: [-35.0, 25.0, 1.0]
     extensions: [1.5, 6.0, 1.0]
     color: [0.0, 0.0, 1.0, 1.0]
     
-  Green_Platform:
+  P1:
     center: [-15.0, 35.0, 0.2]
     extensions: [5.0, 5.0, 0.2]
     color: [0.0, 1.0, 0.0, 1.0]
     
-  Yellow_Pillar:
+  PL1:
     center: [-40.0, -10.0, 4.0]
     extensions: [1.0, 1.0, 4.0]
     color: [1.0, 1.0, 0.0, 1.0]
     
-  Cyan_Box:
+  B3:
     center: [-25.0, -25.0, 1.0]
     extensions: [1.0, 1.0, 1.0]
     color: [0.0, 1.0, 1.0, 1.0]
     
-  Magenta_Box:
+  B4:
     center: [-10.0, -15.0, 2.0]
     extensions: [2.0, 2.0, 2.0]
     color: [1.0, 0.0, 1.0, 1.0]

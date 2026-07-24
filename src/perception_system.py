@@ -15,57 +15,56 @@ class PerceptionSystem:
     def _is_aabb_in_frustum(self, vertices: list, agent_pos: np.ndarray, 
                             agent_fwd: np.ndarray, agent_right: np.ndarray, agent_up: np.ndarray) -> bool:
         """
-        Esegue un Frustum Culling robusto valutando l'oggetto contro i piani della piramide.
-        Se tutti gli 8 vertici dell'AABB sono sul lato "sbagliato" di un singolo piano,
-        l'oggetto è matematicamente fuori dal campo visivo.
+        Runs a robust Frustum Culling by evaluating the object against the planes of the frustum.
+        If all 8 vertices of the AABB are on the "wrong" side of a single plane,
+        the object is mathematically outside the field of view.
         """
-        # Convertiamo tutti i vertici nello spazio locale della telecamera
+        # Convert all vertices in the local space of the camera
         local_vertices = []
         for v in vertices:
             vec = v - agent_pos
-            y = np.dot(vec, agent_fwd)   # Profondità (Avanti)
-            x = np.dot(vec, agent_right) # Asse Orizzontale (Destra/Sinistra)
-            z = np.dot(vec, agent_up)    # Asse Verticale (Alto/Basso)
+            y = np.dot(vec, agent_fwd)   # Depth (Front/Back)
+            x = np.dot(vec, agent_right) # Horizontal Axis (Right/Left)
+            z = np.dot(vec, agent_up)    # Vertical Axis (Up/Down)
             local_vertices.append((x, y, z))
 
-        # Test 1: Piano Near (Tutti i vertici sono dietro la telecamera?)
+        # Test 1: Near Plane (All vertices are behind the camera?)
         if all(y <= 0 for x, y, z in local_vertices): return False
         
-        # Test 2: Piano Far (Tutti i vertici superano la distanza massima?)
+        # Test 2: Far Plane (All vertices are beyond the maximum range?)
         if self.max_range > 0 and all(y > self.max_range for x, y, z in local_vertices): return False
 
-        # Test 3: Piano Destro (Tutti i vertici sono oltre il bordo destro?)
+        # Test 3: Right Plane (All vertices are beyond the right edge?)
         if all(x > y * self.tan_half_fov_h for x, y, z in local_vertices): return False
         
-        # Test 4: Piano Sinistro (Tutti i vertici sono oltre il bordo sinistro?)
+        # Test 4: Left Plane (All vertices are beyond the left edge?)
         if all(x < -y * self.tan_half_fov_h for x, y, z in local_vertices): return False
 
-        # Test 5: Piano Superiore (Tutti i vertici sono oltre il limite alto?)
+        # Test 5: Top Plane (All vertices are beyond the upper limit?)
         if all(z > y * self.tan_half_fov_v for x, y, z in local_vertices): return False
         
-        # Test 6: Piano Inferiore (Tutti i vertici sono sotto il limite basso?)
+        # Test 6: Bottom Plane (All vertices are below the lower limit?)
         if all(z < -y * self.tan_half_fov_v for x, y, z in local_vertices): return False
 
-        # Se l'oggetto non è stato scartato da nessuno dei piani, allora attraversa l'inquadratura!
+        # If the object has not been discarded by any of the planes, then it crosses the frustum!
         return True
 
     def scan_environment(self, collision_queue, agent: AgentState, world_objects: dict) -> list:
-        # 1. BROAD-PHASE (Fisica)
+        # 1. BROAD-PHASE (Physics)
         nearby_objects = set()
         for i in range(collision_queue.getNumEntries()):
             hit_node = collision_queue.getEntry(i).getIntoNodePath()
             if hit_node.hasTag("obj_id"):
                 nearby_objects.add(hit_node.getTag("obj_id"))
 
-        # 2. NARROW-PHASE (Matematica)
+        # 2. NARROW-PHASE (Mathematics)
         visible_objects = []
         if not nearby_objects:
             return visible_objects
             
         agent_pos = agent.position + np.array([0, 0, 2])
         
-        # CORREZIONE PITCH: Calcoliamo il vero vettore tridimensionale 
-        # includendo l'inclinazione della telecamera (Pitch)
+        # Compute the forward vector based on yaw and pitch, including the camera's pitch for vertical orientation.
         pitch_rad = np.radians(agent.pitch)
         yaw_rad = np.radians(agent.yaw)
         
@@ -76,11 +75,11 @@ class PerceptionSystem:
         agent_fwd = np.array([fwd_x, fwd_y, fwd_z])
         agent_fwd = agent_fwd / np.linalg.norm(agent_fwd)
         
-        # Rigeneriamo gli assi Right e Up basandoci sul nuovo Forward inclinato
+        # Restore Right and Up axes based on the new forward vector
         global_up = np.array([0.0, 0.0, 1.0])
         agent_right = np.cross(agent_fwd, global_up)
         
-        # Protezione matematica nel caso in cui stiamo guardando perfettamente verso l'alto/basso
+        # Mathematical protection in the case we are looking perfectly up/down
         if np.linalg.norm(agent_right) > 0.001:
             agent_right = agent_right / np.linalg.norm(agent_right)
         else:
@@ -89,7 +88,7 @@ class PerceptionSystem:
         agent_up = np.cross(agent_right, agent_fwd)
         agent_up = agent_up / np.linalg.norm(agent_up)
 
-        # Scansione Oggetti
+        # Object scanning: For each nearby object, check if its AABB is within the frustum defined by the agent's position and orientation.
         for obj_id in nearby_objects:
             obj_data = world_objects[obj_id]
             vertices = obj_data["vertices"]

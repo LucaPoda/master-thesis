@@ -7,6 +7,8 @@ from world_state import WorldState
 from perception_system import PerceptionSystem
 from graphic_engine import GraphicEngine
 from controllers import KeyboardController
+from agent_state import GraphTracker
+from visualizer_server import GraphVisualizerBridge
 
 def load_yaml_config(file_name: str) -> dict:
     """Helper function to load yaml files from the config folder"""
@@ -24,17 +26,34 @@ class SimulationCoordinator:
         view_config = load_yaml_config("config_view.yaml")
         controller_config = load_yaml_config("config_controllers.yaml")
 
-        # 1. Initialize Independent Nodes
+        # 0. Load Dynamic Configurations
         self.world = WorldState(map_config)
         self.perception = PerceptionSystem(sensor_config)
-        
         self.graphics = GraphicEngine(view_config, sensor_config)
         self.controller = KeyboardController(controller_config)
         
-        # 2. Setup Graphic and Physical
+        # Setup Graph Tracker e Web Server ---
+        self.tracker = GraphTracker()
+        
+        # Extract dynamically the colors from the WorldState converting them for the Web
+        dynamic_colors = {}
+        for obj_id, obj_data in self.world.get_objects().items():
+            # obj_data["color"] is an [r, g, b, a] list in a [0.0 - 1.0] range
+            r, g, b, a = obj_data["color"]
+            dynamic_colors[obj_id] = f"rgba({int(r*255)}, {int(g*255)}, {int(b*255)}, {a})"
+            
+        self.bridge = GraphVisualizerBridge(
+            tracker=self.tracker, 
+            config_colors=dynamic_colors, 
+            host="127.0.0.1", 
+            port=8000
+        )
+        self.bridge.start() # Start the web server in a daemon thread
+        
+        # 2. Setup Grafico e Fisico
         self.graphics.initialize_world_graphics(self.world.get_objects())
 
-        # 3. Register the simulation loop
+        # 3. Register the main simulation loop
         self.graphics.taskMgr.add(self.tick, "main_simulation_loop")
 
     def tick(self, task):
@@ -43,19 +62,21 @@ class SimulationCoordinator:
         # --- PHASE 1: INPUT ---
         raw_inputs = self.graphics.poll_inputs()
         
-        # --- PHASE 2: DECISION / CONTROL ---
+        # --- PHASE 2: DECISIONE / CONTROLLO ---
         agent_state = self.world.get_agent_state()
         command = self.controller.get_command(agent_state, dt, inputs=raw_inputs)
         
-        # --- PHASE 3: PHYSICS (Ground Truth) ---
+        # --- PHASE 3: AGGIORNAMENTO FISICO (Ground Truth) ---
         self.world.apply_command(command, dt)
         
-        # --- PHASE 4: PERCEPTION SIMULATED ---
+        # --- PHASE 4: PERCEZIONE SIMULATA ---
         perceived_ids = self.perception.scan_environment(
             self.graphics.cHandler,
             self.world.get_agent_state(),
             self.world.get_objects()
         )
+        
+        self.tracker.update_state(perceived_ids)
         
         # --- PHASE 5: RENDERING ---
         self.graphics.update_render(
