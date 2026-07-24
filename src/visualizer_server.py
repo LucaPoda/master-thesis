@@ -6,8 +6,9 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from agent_state import GraphTracker
+from interfaces import BaseGraphVisualizer
 
-class GraphVisualizerBridge:
+class GraphVisualizerBridge(BaseGraphVisualizer):
     def __init__(self, tracker: GraphTracker, config_colors: dict, host: str = "127.0.0.1", port: int = 8000):
         self.tracker = tracker
         self.config_colors = config_colors
@@ -73,3 +74,12 @@ class GraphVisualizerBridge:
                 await connection.send_text(message)
             except Exception:
                 pass
+
+    def publish_update(self, payload: str) -> None:
+        if not self.loop or not self.active_connections:
+            return
+        asyncio.run_coroutine_threadsafe(self._broadcast(payload), self.loop)
+
+    def on_graph_updated(self):
+        payload = self._serialize_graph()
+        self.publish_update(payload)

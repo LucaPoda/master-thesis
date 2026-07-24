@@ -1,28 +1,26 @@
 import numpy as np
-from core_types import AgentState, MovementCommand
-
-class BaseController:
-    def get_command(self, agent_state: AgentState, dt: float, **kwargs) -> MovementCommand:
-        raise NotImplementedError
+from interfaces import BaseController
+from core_types import MovementCommand, PerceptionInput
 
 class KeyboardController(BaseController):
     def __init__(self, config):
         self.speed = config["max_speed"]
         self.mouse_sens = config["mouse_sensitivity"]
 
-    def get_command(self, agent_state: AgentState, dt: float, inputs=None) -> MovementCommand:
-        """
-        Inputs is a dictionary coming from the graphics engine (e.g., keys pressed and mouse delta).
-        To decouple, the controller does not read directly from Panda3D, but from the raw data passed in the loop.
-        """
-        inputs = inputs or {"keys": {}, "mouse_dx": 0, "mouse_dy": 0}
-        keys = inputs.get("keys", {})
+    def get_command(self, inputs: PerceptionInput, dt: float, **kwargs) -> MovementCommand:
+        # Extract the required components from the unconstrained ROS-like buffer
+        agent_state = inputs.get("agent_state")
+        raw_inputs = inputs.get("raw_inputs")  
         
-        yaw_delta = -inputs.get("mouse_dx", 0) * self.mouse_sens
-        pitch_delta = -inputs.get("mouse_dy", 0) * self.mouse_sens
+        # raw_inputs is a standard dictionary coming from GraphicEngine.poll_inputs()
+        keys = raw_inputs.get("keys", {})
+        
+        # Apply dictionary get() with default values on raw_inputs, not on PerceptionInput
+        yaw_delta = -raw_inputs.get("mouse_dx", 0) * self.mouse_sens
+        pitch_delta = -raw_inputs.get("mouse_dy", 0) * self.mouse_sens
 
         fwd = agent_state.get_forward_vector()
-        right = np.array([fwd[1], -fwd[0], 0.0]) # Ruotato di -90 gradi su Z
+        right = np.array([fwd[1], -fwd[0], 0.0]) # Rotated -90 degrees on Z
         up = np.array([0.0, 0.0, 1.0])
 
         vel = np.zeros(3)
@@ -47,7 +45,9 @@ class PositionController(BaseController):
     def set_target(self, pos: np.ndarray):
         self.target_position = pos
 
-    def get_command(self, agent_state: AgentState, dt: float, **kwargs) -> MovementCommand:
+    def get_command(self, inputs: PerceptionInput, dt: float, **kwargs) -> MovementCommand:
+        agent_state = inputs.get("agent_state")
+        
         if self.target_position is None:
             return MovementCommand(np.zeros(3), 0.0, 0.0)
 

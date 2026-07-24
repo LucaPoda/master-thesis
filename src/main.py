@@ -2,9 +2,10 @@ import yaml
 from pathlib import Path
 from direct.task import Task
 
-# Import the classes from their respective modules in src/
+from core_types import PerceptionInput
 from world_state import WorldState
-from perception_system import PerceptionSystem
+from perception_system import FrustumPerceptionSystem
+from spatial_reasoner import GroundTruthSpatialReasoner
 from graphic_engine import GraphicEngine
 from controllers import KeyboardController
 from agent_state import GraphTracker
@@ -20,65 +21,63 @@ def load_yaml_config(file_name: str) -> dict:
 
 class SimulationCoordinator:
     def __init__(self):
-        # 0. Load Dynamic Configurations
+        # 0. Load configs
         map_config = load_yaml_config("config_map.yaml")
         sensor_config = load_yaml_config("config_sensors.yaml")
         view_config = load_yaml_config("config_view.yaml")
         controller_config = load_yaml_config("config_controllers.yaml")
 
-        # 0. Load Dynamic Configurations
+        # 1. Instantiate State
         self.world = WorldState(map_config)
-        self.perception = PerceptionSystem(sensor_config)
-        self.graphics = GraphicEngine(view_config, sensor_config)
-        self.controller = KeyboardController(controller_config)
-        
-        # Setup Graph Tracker e Web Server ---
         self.tracker = GraphTracker()
         
-        # Extract dynamically the colors from the WorldState converting them for the Web
+        # 2. Dependency Injection / Concrete Strategies
+        self.perception = FrustumPerceptionSystem(sensor_config)
+        self.spatial_reasoner = GroundTruthSpatialReasoner()
+        self.controller = KeyboardController(controller_config)
+        self.graphics = GraphicEngine(view_config, sensor_config)
+        
+        # Setup Web Bridge
         dynamic_colors = {}
         for obj_id, obj_data in self.world.get_objects().items():
-            # obj_data["color"] is an [r, g, b, a] list in a [0.0 - 1.0] range
             r, g, b, a = obj_data["color"]
             dynamic_colors[obj_id] = f"rgba({int(r*255)}, {int(g*255)}, {int(b*255)}, {a})"
             
         self.bridge = GraphVisualizerBridge(
             tracker=self.tracker, 
-            config_colors=dynamic_colors, 
-            host="127.0.0.1", 
-            port=8000
+            config_colors=dynamic_colors
         )
-        self.bridge.start() # Start the web server in a daemon thread
+        self.bridge.start()
         
-        # 2. Setup Grafico e Fisico
+        # Initialize rendering
         self.graphics.initialize_world_graphics(self.world.get_objects())
-
-        # 3. Register the main simulation loop
         self.graphics.taskMgr.add(self.tick, "main_simulation_loop")
 
     def tick(self, task):
         dt = self.graphics.taskMgr.globalClock.getDt()
         
-        # --- PHASE 1: INPUT ---
-        raw_inputs = self.graphics.poll_inputs()
-        
-        # --- PHASE 2: DECISIONE / CONTROLLO ---
-        agent_state = self.world.get_agent_state()
-        command = self.controller.get_command(agent_state, dt, inputs=raw_inputs)
-        
-        # --- PHASE 3: AGGIORNAMENTO FISICO (Ground Truth) ---
-        self.world.apply_command(command, dt)
-        
-        # --- PHASE 4: PERCEZIONE SIMULATA ---
-        perceived_ids = self.perception.scan_environment(
-            self.graphics.cHandler,
-            self.world.get_agent_state(),
-            self.world.get_objects()
+        # 1. Populate untyped input buffer (ROS Topic equivalent)
+        inputs = PerceptionInput(
+            raw_inputs=self.graphics.poll_inputs(),
+            agent_state=self.world.get_agent_state(),
+            world_objects=self.world.get_objects(),
+            collision_queue=self.graphics.cHandler
         )
         
-        self.tracker.update_state(perceived_ids)
+        # 2. Controller
+        command = self.controller.get_command(inputs, dt)
         
-        # --- PHASE 5: RENDERING ---
+        # 3. Physics Ground Truth
+        self.world.apply_command(command, dt)
+        
+        # 4. Perception & Reasoning
+        perceived_ids = self.perception.scan_environment(inputs)
+        semantic_state = self.spatial_reasoner.compute_relations(perceived_ids, inputs)
+        
+        # 5. Graph Topology 
+        self.tracker.update_state(semantic_state)
+        
+        # 6. Render
         self.graphics.update_render(
             self.world.get_agent_state(),
             self.world.get_objects(),

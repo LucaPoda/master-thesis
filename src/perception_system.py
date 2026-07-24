@@ -1,8 +1,8 @@
-# perception_system.py
 import numpy as np
-from core_types import AgentState
+from interfaces import BasePerceptionSystem
+from core_types import PerceptionInput
 
-class PerceptionSystem:
+class FrustumPerceptionSystem(BasePerceptionSystem):
     def __init__(self, sensor_config):
         fov_h_rad = np.radians(sensor_config.get("fov_horizontal", 90.0))
         fov_v_rad = np.radians(sensor_config.get("fov_vertical", 60.0))
@@ -49,8 +49,13 @@ class PerceptionSystem:
         # If the object has not been discarded by any of the planes, then it crosses the frustum!
         return True
 
-    def scan_environment(self, collision_queue, agent: AgentState, world_objects: dict) -> list:
-        # 1. BROAD-PHASE (Physics)
+    def scan_environment(self, inputs: PerceptionInput) -> list[str]:
+        # Read from generic payload
+        collision_queue = inputs.get("collision_queue")
+        agent = inputs.get("agent_state")
+        world_objects = inputs.get("world_objects")
+
+        # 1. BROAD-PHASE (Physics)[cite: 7]
         nearby_objects = set()
         for i in range(collision_queue.getNumEntries()):
             hit_node = collision_queue.getEntry(i).getIntoNodePath()
