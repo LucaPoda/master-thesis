@@ -1,0 +1,5 @@
+window_title: "Semantic Graph Fist Demo"
+global_fov: 120.0
+camera_mode: "first_person"
+third_person_dist: 8.0
+third_person_height: 4.0

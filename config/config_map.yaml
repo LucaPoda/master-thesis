@@ -1,0 +1,15 @@
+world_size: [50, 50, 1]
+ground_color: [0.2, 0.2, 0.2, 1.0]
+agent_start_pos: [0, 0, 1]
+agent_start_yaw: 0.0
+
+objects:
+  Muro_Nord:
+    center: [0.0, 10.0, 1.0]
+    estensioni: [5.0, 0.5, 2.0]
+    color: [1.0, 0.0, 0.0, 1.0]
+  
+  Pilastro_Centrale:
+    center: [5.0, 5.0, 1.0]
+    estensioni: [1.0, 1.0, 3.0]
+    color: [0.0, 1.0, 0.0, 1.0]
