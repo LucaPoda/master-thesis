@@ -26,3 +26,11 @@ def test_semantic_state_frozen_key():
     
     # The frozen keys must be completely identical
     assert state1.to_frozen_key() == state2.to_frozen_key()
+
+def test_semantic_state_empty_instantiation():
+    """Verify that default initializers create a valid empty frozen key."""
+    state1 = SemanticState()
+    state2 = SemanticState(visible_objects=set(), relations=set())
+    
+    assert state1.to_frozen_key() == frozenset()
+    assert state1.to_frozen_key() == state2.to_frozen_key()

@@ -20,3 +20,11 @@ def test_perception_input_none():
     
     with pytest.raises(ValueError, match="Missing required input field/topic: 'world_objects'"):
         inputs.get("world_objects")
+
+def test_perception_input_falsy_values():
+    """Verify that falsy values (0, False, []) are valid and do not raise missing field errors."""
+    inputs = PerceptionInput(zero_val=0, bool_val=False, empty_list=[])
+    
+    assert inputs.get("zero_val") == 0
+    assert inputs.get("bool_val") is False
+    assert inputs.get("empty_list") == []

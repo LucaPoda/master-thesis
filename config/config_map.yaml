@@ -5,98 +5,55 @@ agent_start_yaw: 0.0
 
 objects:
   # ==========================================
-  # Perimeter Walls (Dark Blue)
+  # Stacked Zone (Tests on-top, on-bottom)
   # ==========================================
-  NW:
-    center: [0.0, 50.0, 2.5]
-    extensions: [50.0, 1.0, 2.5]
-    color: [0.1, 0.4, 0.5, 1.0] 
+  P1: # Platform
+    center: [-15.0, 0.0, 1.0]
+    extensions: [3.0, 3.0, 1.0]
+    color: [0.0, 1.0, 0.0, 1.0] 
     
-  SW:
-    center: [0.0, -50.0, 2.5]
-    extensions: [50.0, 1.0, 2.5]
-    color: [0.1, 0.4, 0.5, 1.0]
-    
-  EW:
-    center: [50.0, 0.0, 2.5]
-    extensions: [1.0, 50.0, 2.5]
-    color: [0.1, 0.4, 0.5, 1.0]
-    
-  WW:
-    center: [-50.0, 0.0, 2.5]
-    extensions: [1.0, 50.0, 2.5]
-    color: [0.1, 0.4, 0.5, 1.0]
+  B1: # Box resting perfectly on top of P1 (P1 max_z = 2.0, B1 min_z = 2.0)
+    center: [-15.0, 0.0, 3.0]
+    extensions: [1.0, 1.0, 1.0]
+    color: [1.0, 0.0, 0.0, 1.0]
 
   # ==========================================
-  # Central Zone
+  # Suspended Zone (Tests over, under)
   # ==========================================
-  M1:
-    center: [0.0, 0.0, 5.0]
-    extensions: [4.0, 4.0, 5.0]
-    color: [0.4, 0.1, 0.6, 1.0] 
-
-  # ==========================================
-  # COLONNADE AREA
-  # ==========================================
-  C1:
-    center: [15.0, -20.0, 3.0]
-    extensions: [0.5, 0.5, 3.0]
-    color: [0.8, 0.6, 0.1, 1.0]
-    
-  C2:
-    center: [15.0, -5.0, 3.0]
-    extensions: [0.5, 0.5, 3.0]
-    color: [0.8, 0.6, 0.1, 1.0]
-    
-  C3:
-    center: [15.0, 10.0, 3.0]
-    extensions: [0.5, 0.5, 3.0]
-    color: [0.8, 0.6, 0.1, 1.0]
-    
-  C4:
-    center: [15.0, 25.0, 3.0]
-    extensions: [0.5, 0.5, 3.0]
-    color: [0.8, 0.6, 0.1, 1.0]
-
-  # ==========================================
-  # CORRIDOR AREA AND DISPERSAL AREA
-  # ==========================================
-  W5:
-    center: [30.0, 0.0, 2.0]
-    extensions: [1.0, 35.0, 2.0]
-    color: [0.5, 0.2, 0.2, 1.0] 
-    
-  O1:
-    center: [40.0, 15.0, 1.0]
-    extensions: [2.0, 2.0, 1.0]
+  O1: # Ground Obstacle
+    center: [15.0, 0.0, 1.0]
+    extensions: [1.0, 1.0, 1.0]
     color: [1.0, 0.5, 0.0, 1.0] 
 
-  B1:
-    center: [-20.0, 10.0, 1.5]
-    extensions: [2.0, 2.0, 1.5]
-    color: [1.0, 0.0, 0.0, 1.0]
-    
-  B2:
-    center: [-35.0, 25.0, 1.0]
-    extensions: [1.5, 6.0, 1.0]
-    color: [0.0, 0.0, 1.0, 1.0]
-    
-  P1:
-    center: [-15.0, 35.0, 0.2]
-    extensions: [5.0, 5.0, 0.2]
-    color: [0.0, 1.0, 0.0, 1.0]
-    
-  PL1:
-    center: [-40.0, -10.0, 4.0]
-    extensions: [1.0, 1.0, 4.0]
-    color: [1.0, 1.0, 0.0, 1.0]
-    
-  B3:
-    center: [-25.0, -25.0, 1.0]
-    extensions: [1.0, 1.0, 1.0]
+  A1: # Arch / Beam floating directly over O1 (O1 max_z=2.0, A1 min_z=5.0)
+    center: [15.0, 0.0, 6.0]
+    extensions: [3.0, 1.0, 1.0]
     color: [0.0, 1.0, 1.0, 1.0]
-    
-  B4:
-    center: [-10.0, -15.0, 2.0]
-    extensions: [2.0, 2.0, 2.0]
-    color: [1.0, 0.0, 1.0, 1.0]
+
+  # ==========================================
+  # Alignment Grid (Tests left, right, front, back)
+  # ==========================================
+  C1:
+    center: [0.0, 20.0, 1.0]
+    extensions: [0.5, 0.5, 1.0]
+    color: [0.8, 0.6, 0.1, 1.0]
+  C2:
+    center: [5.0, 20.0, 1.0] # Right of C1
+    extensions: [0.5, 0.5, 1.0]
+    color: [0.8, 0.6, 0.1, 1.0]
+  C3:
+    center: [5.0, 25.0, 1.0] # Right of C1, Front of C2
+    extensions: [0.5, 0.5, 1.0]
+    color: [0.8, 0.6, 0.1, 1.0]
+
+  # ==========================================
+  # Proximity Cluster (Tests near)
+  # ==========================================
+  CR1:
+    center: [-30.0, 30.0, 1.0]
+    extensions: [1.0, 1.0, 1.0]
+    color: [0.4, 0.1, 0.6, 1.0]
+  CR2:
+    center: [-33.0, 31.0, 1.0] # Dist = ~3.16 (Near CR1)
+    extensions: [1.0, 1.0, 1.0]
+    color: [0.4, 0.1, 0.6, 1.0]

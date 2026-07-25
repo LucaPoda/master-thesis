@@ -47,10 +47,10 @@ class GraphTracker:
             
         # 4. Management of edges (create link with previous node)
         if self.current_node_id is not None and self.current_node_id != target_id:
-            # Sort the tuple to ensure that the edge (A, B) is equal to (B, A)
+            # Sort the tuple to ensure that the edge (A, B) is equal to (B, A) (Undirected)
             edge = tuple(sorted((self.current_node_id, target_id)))
             self.edges.add(edge)
-
+            
         # 5. Update the current node and notify
         self.current_node_id = target_id
         self._notify()

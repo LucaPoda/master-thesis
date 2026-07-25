@@ -1,7 +1,8 @@
 import pytest
 from agent_state import GraphTracker
-from core_types import SemanticState, PerceptionInput
+from core_types import AgentState, SemanticState, PerceptionInput, SpatialRelation
 from spatial_reasoner import GroundTruthSpatialReasoner
+import numpy as np
 
 def test_empty_semantic_state():
     """Verify that an empty state does not crash the tracker and serializes correctly."""
@@ -40,12 +41,13 @@ def test_single_object_no_relations():
     """Verify the reasoner gracefully handles a single object without computing pairwise relations."""
     reasoner = GroundTruthSpatialReasoner()
     
-    # Provide world context, but we will only pass one object as "visible"
+    # Provide world context including extensions
     mock_world_objects = {
-        "A": {"center": [0, 0, 0]},
-        "B": {"center": [1, 1, 0]}
+        "A": {"center": [0, 0, 0], "extensions": [1, 1, 1]},
+        "B": {"center": [1, 1, 0], "extensions": [1, 1, 1]}
     }
-    inputs = PerceptionInput(world_objects=mock_world_objects)
+    dummy_agent = AgentState(position=np.array([0, 0, 0]), yaw=0.0, pitch=0.0)
+    inputs = PerceptionInput(world_objects=mock_world_objects, agent_state=dummy_agent)
     
     # Compute relations for only 1 visible object
     state = reasoner.compute_relations(["A"], inputs)
@@ -58,13 +60,14 @@ def test_pipeline_integration_headless():
     reasoner = GroundTruthSpatialReasoner()
     tracker = GraphTracker()
     
-    # 1. Setup mock environment
+    # 1. Setup mock environment (Ensure extensions are present for AABB calculations)
     mock_world_objects = {
-        "Obj_1": {"center": [0, 0, 0]},
-        "Obj_2": {"center": [2, 0, 0]},  # Near Obj_1 (dist = 2.0 < 4.0 threshold)
-        "Obj_3": {"center": [50, 50, 50]} # Far away
+        "Obj_1": {"center": [0, 0, 0], "extensions": [1, 1, 1]},
+        "Obj_2": {"center": [2, 0, 0], "extensions": [1, 1, 1]},  # Near Obj_1 (dist = 2.0 < 8.0 threshold)
+        "Obj_3": {"center": [50, 50, 50], "extensions": [1, 1, 1]} # Far away
     }
-    inputs = PerceptionInput(world_objects=mock_world_objects)
+    dummy_agent = AgentState(position=np.array([0, 0, 0]), yaw=0.0, pitch=0.0)
+    inputs = PerceptionInput(world_objects=mock_world_objects, agent_state=dummy_agent)
     
     # 2. Execute Reasoner (Mocking perception output: we see Obj_1 and Obj_2)
     perceived_ids = ["Obj_1", "Obj_2"]
@@ -85,3 +88,26 @@ def test_pipeline_integration_headless():
     # Verify relations were calculated and stored in the graph
     assert "Obj_1_near_Obj_2" in node["relations"]
     assert "Obj_2_near_Obj_1" in node["relations"]
+    
+def test_topology_divergence_on_relations():
+    """Verify nodes correctly diverge if relations change but objects remain identical."""
+    tracker = GraphTracker()
+    
+    # State 1: A and B are near
+    state_1 = SemanticState(
+        visible_objects={"A", "B"},
+        relations={SpatialRelation("A", "near", "B")}
+    )
+    
+    # State 2: A and B are visible, but A is now ON-TOP of B
+    state_2 = SemanticState(
+        visible_objects={"A", "B"},
+        relations={SpatialRelation("A", "on-top", "B")}
+    )
+    
+    tracker.update_state(state_1)
+    tracker.update_state(state_2)
+    
+    # Assert they created two distinct nodes because the relations mutated the frozen key
+    assert tracker.current_node_id == 2
+    assert len(tracker.nodes) == 2

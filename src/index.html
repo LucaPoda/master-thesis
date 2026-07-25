@@ -56,6 +56,7 @@
         const edges = new vis.DataSet([]);
         
         let globalData = { nodes: [], colors: {} };
+        let pinnedNode = null; 
 
         const options = {
             nodes: { shape: 'dot', size: 15, font: { size: 14, color: '#ffffff' } },
@@ -66,20 +67,25 @@
 
         const network = new vis.Network(container, { nodes, edges }, options);
 
-        // Helper per generare quadrati HTML
         function generateSquare(objId) {
             const color = globalData.colors[objId] || '#555';
             return `<div class="object-square" style="background-color: ${color};">${objId}</div>`;
         }
+        
+        function formatRelation(relString, highlightColor = "") {
+            const parts = relString.split('_');
+            const style = highlightColor ? `border-left: 3px solid ${highlightColor}; padding-left: 5px;` : '';
+            return `<div style="margin-top: 4px; font-size: 12px; ${style}">
+                ${generateSquare(parts[0])} <b>${parts[1]}</b> ${generateSquare(parts[2])}
+            </div>`;
+        }
 
-        // Websocket Connection
         const ws = new WebSocket(`ws://${location.host}/ws`);
         
         ws.onmessage = function(event) {
             const data = JSON.parse(event.data);
-            globalData = data; // Salva in locale
+            globalData = data; 
             
-            // Format Vis.js nodes
             const visNodes = data.nodes.map(n => ({
                 id: n.id,
                 label: n.label,
@@ -91,51 +97,91 @@
                 shadow: n.is_current
             }));
 
-            nodes.update(visNodes); // Update or add
+            nodes.update(visNodes); 
             edges.update(data.edges);
         };
 
-        // UI Interactions
-        network.on("hoverNode", function (params) {
-            const nodeId = params.node;
+        function renderNodeDetails(nodeId, isPinned) {
             const nodeData = globalData.nodes.find(n => n.id === nodeId);
-            if (nodeData) {
-                document.getElementById('hover-panel').style.display = 'block';
-                document.getElementById('hover-title').innerText = nodeData.label;
-                const html = nodeData.objects.map(generateSquare).join('');
-                document.getElementById('hover-content').innerHTML = html || '<i>Nessun oggetto</i>';
+            if (!nodeData) return;
+            
+            const panel = document.getElementById('hover-panel');
+            panel.style.display = 'block';
+            panel.style.border = isPinned ? "2px solid #ff3b30" : "none"; 
+            
+            const title = isPinned ? `${nodeData.label} 📌` : nodeData.label;
+            document.getElementById('hover-title').innerText = title;
+            
+            const objHtml = nodeData.objects.map(generateSquare).join('');
+            const objSection = `<div><strong>Objects:</strong><br>${objHtml || '<i>None</i>'}</div>`;
+            
+            let relHtml = '<i>None</i>';
+            if (nodeData.relations && nodeData.relations.length > 0) {
+                relHtml = nodeData.relations.map(r => formatRelation(r)).join('');
+            }
+            const relSection = `<div style="margin-top:10px;"><strong>Relations:</strong><br>${relHtml}</div>`;
+            
+            document.getElementById('hover-content').innerHTML = objSection + relSection;
+        }
+
+        network.on("hoverNode", function (params) {
+            if (!pinnedNode) {
+                renderNodeDetails(params.node, false);
             }
         });
 
         network.on("blurNode", function () {
-            document.getElementById('hover-panel').style.display = 'none';
+            if (!pinnedNode) {
+                document.getElementById('hover-panel').style.display = 'none';
+            }
         });
 
         network.on("click", function (params) {
             const diffPanel = document.getElementById('diff-panel');
             
-            // Selezionato un arco (e nessun nodo sovrapposto)
-            if (params.edges.length === 1 && params.nodes.length === 0) {
+            if (params.nodes.length > 0) {
+                pinnedNode = params.nodes[0];
+                renderNodeDetails(pinnedNode, true);
+                diffPanel.style.display = 'none';
+                
+            } else if (params.edges.length === 1 && params.nodes.length === 0) {
+                pinnedNode = null; 
+                document.getElementById('hover-panel').style.display = 'none';
+                document.getElementById('hover-panel').style.border = 'none';
+                
                 const edgeId = params.edges[0];
                 const edge = globalData.edges.find(e => e.id === edgeId);
                 
                 const nodeA = globalData.nodes.find(n => n.id === edge.from);
                 const nodeB = globalData.nodes.find(n => n.id === edge.to);
                 
-                const setA = new Set(nodeA.objects);
-                const setB = new Set(nodeB.objects);
-                
-                const onlyInA = nodeA.objects.filter(x => !setB.has(x));
-                const onlyInB = nodeB.objects.filter(x => !setA.has(x));
+                // Object Diffs
+                const setObjA = new Set(nodeA.objects);
+                const setObjB = new Set(nodeB.objects);
+                const objOnlyInA = nodeA.objects.filter(x => !setObjB.has(x));
+                const objOnlyInB = nodeB.objects.filter(x => !setObjA.has(x));
 
-                document.getElementById('diff-side-a-title').innerText = `Solo in ${nodeA.label}:`;
-                document.getElementById('diff-side-a').innerHTML = onlyInA.map(generateSquare).join('') || '-';
+                // Relation Diffs
+                const setRelA = new Set(nodeA.relations || []);
+                const setRelB = new Set(nodeB.relations || []);
+                const relOnlyInA = (nodeA.relations || []).filter(x => !setRelB.has(x));
+                const relOnlyInB = (nodeB.relations || []).filter(x => !setRelA.has(x));
+
+                document.getElementById('diff-side-a-title').innerText = `Solo in ${nodeA.label} (Removed from B):`;
+                let htmlA = `<div><strong>Objects:</strong></div>` + (objOnlyInA.map(generateSquare).join('') || '-');
+                htmlA += `<div style="margin-top:8px;"><strong>Relations:</strong></div>` + (relOnlyInA.map(r => formatRelation(r, '#ff4444')).join('') || '-');
+                document.getElementById('diff-side-a').innerHTML = htmlA;
                 
-                document.getElementById('diff-side-b-title').innerText = `Solo in ${nodeB.label}:`;
-                document.getElementById('diff-side-b').innerHTML = onlyInB.map(generateSquare).join('') || '-';
+                document.getElementById('diff-side-b-title').innerText = `Solo in ${nodeB.label} (Added in B):`;
+                let htmlB = `<div><strong>Objects:</strong></div>` + (objOnlyInB.map(generateSquare).join('') || '-');
+                htmlB += `<div style="margin-top:8px;"><strong>Relations:</strong></div>` + (relOnlyInB.map(r => formatRelation(r, '#44ff44')).join('') || '-');
+                document.getElementById('diff-side-b').innerHTML = htmlB;
                 
                 diffPanel.style.display = 'block';
             } else {
+                pinnedNode = null;
+                document.getElementById('hover-panel').style.display = 'none';
+                document.getElementById('hover-panel').style.border = 'none';
                 diffPanel.style.display = 'none';
             }
         });

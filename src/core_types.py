@@ -33,7 +33,9 @@ class SemanticState:
 
     def to_frozen_key(self) -> frozenset:
         """Combines objects and relations into a single frozenset for hashing."""
-        return frozenset(list(self.visible_objects) + list(self.relations))
+        # Convert relations to explicit tuples (subject, relation, target) to guarantee absolute hash divergence
+        rel_tuples = [(r.subject, r.relation, r.target) for r in self.relations]
+        return frozenset(list(self.visible_objects) + rel_tuples)
 
 class PerceptionInput:
     """

@@ -88,3 +88,45 @@ def test_serialization(tracker):
     # Ensure it is purely JSON serializable
     json_str = json.dumps(data)
     assert "A_near_B" in json_str
+
+def test_different_relations_create_different_nodes(tracker):
+    """Verify nodes diverge if relations change but objects remain identical."""
+    state_1 = SemanticState(
+        visible_objects={"A", "B"},
+        relations={SpatialRelation("A", "left", "B")}
+    )
+    tracker.update_state(state_1)
+    
+    state_2 = SemanticState(
+        visible_objects={"A", "B"},
+        relations={SpatialRelation("A", "right", "B")}
+    )
+    tracker.update_state(state_2)
+    
+    # Assert they created two distinct nodes because the relations mutated the frozen key
+    assert tracker.current_node_id == 2
+    assert len(tracker.nodes) == 2
+    assert len(tracker.edges) == 1
+    assert (1, 2) in tracker.edges  # Verify directed edge
+
+def test_relation_driven_loops(tracker):
+    """Verify that alternating between two relational states loops correctly with undirected edges."""
+    state_left = SemanticState(
+        visible_objects={"A", "B"},
+        relations={SpatialRelation("A", "left", "B")}
+    )
+    state_right = SemanticState(
+        visible_objects={"A", "B"},
+        relations={SpatialRelation("A", "right", "B")}
+    )
+    
+    tracker.update_state(state_left)  # Creates Node 1
+    tracker.update_state(state_right) # Creates Node 2 (Edge (1, 2))
+    tracker.update_state(state_left)  # Re-visits Node 1 (Reuses Edge (1, 2))
+    
+    assert tracker.current_node_id == 1
+    assert len(tracker.nodes) == 2
+    assert len(tracker.edges) == 1
+    
+    # Verify the single undirected edge exists
+    assert (1, 2) in tracker.edges
