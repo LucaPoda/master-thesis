@@ -28,7 +28,7 @@ class WorldState:
         return self.objects
 
     def apply_command(self, cmd: MovementCommand, dt: float):
-        """Applica la cinematica lineare (Velocità * Tempo)"""
+        """Applies the movement command to the agent state"""
         self.agent.position += cmd.velocity * dt
         self.agent.yaw += cmd.yaw_delta
         self.agent.pitch = np.clip(self.agent.pitch + cmd.pitch_delta, -80.0, 80.0)
