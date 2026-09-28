@@ -102,3 +102,62 @@ class FrustumPerceptionSystem(BasePerceptionSystem):
                 visible_objects.append(obj_id)
 
         return visible_objects
+
+class NoisyPerceptionSystem(FrustumPerceptionSystem):
+    def __init__(self, sensor_config):
+        super().__init__(sensor_config)
+        
+        # Load probabilistic settings directly from the configuration file[cite: 10]
+        self.pos_std = sensor_config.get("noise_pos_std_dev", 0.05)
+        self.ext_std = sensor_config.get("noise_ext_std_dev", 0.02)
+        self.min_conf = sensor_config.get("min_confidence_threshold", 0.40)
+        self.base_pos_std = sensor_config.get("noise_pos_base_std", 0.005)
+        self.max_pos_std = sensor_config.get("noise_pos_max_std", 0.30)
+
+        # Set the sensor's update frequency[cite: 10]
+        update_hz = sensor_config.get("update_frequency_hz", 10.0)
+        self.update_interval = 1.0 / update_hz
+        self.last_update_time = -self.update_interval 
+        self.cached_perception = {}
+
+    def scan_environment(self, inputs):
+        # Use cache to respect the sensor update frequency[cite: 9, 10]
+        current_time = inputs.get("timestamp")
+        if current_time - self.last_update_time < self.update_interval:
+            return self.cached_perception
+
+        self.last_update_time = current_time
+        visible_ids = super().scan_environment(inputs)
+        world_objects = inputs.get("world_objects")
+        
+        perceived_data = {}
+        
+        for obj_id in visible_ids:
+            gt_data = world_objects[obj_id]
+
+            # Compute confidence score (using a fixed 0.05 deviation since it is absent from the config)[cite: 9, 10]
+            confidence = 0.90 + np.random.normal(0, 0.05)
+            
+            # Handle false negatives by discarding objects below the confidence threshold[cite: 9, 10]
+            if confidence < self.min_conf:
+                continue
+
+            # Calculate true distance between agent and object[cite: 9]
+            agent_pos = inputs.get("agent_state").position
+            dist = np.linalg.norm(np.array(gt_data["center"]) - agent_pos)
+                        
+            # Apply quadratic model for position noise growth, capped at max_std[cite: 9, 10]
+            dynamic_pos_std = min(self.max_pos_std, self.base_pos_std * (dist ** 2))
+            
+            # Apply random effects simulating measurement fluctuations (zero-mean Gaussian noise)[cite: 6, 9]
+            noisy_center = np.array(gt_data["center"]) + np.random.normal(0, dynamic_pos_std, 3)
+            noisy_ext = np.array(gt_data["extensions"]) + np.random.normal(0, self.ext_std, 3)
+            
+            perceived_data[obj_id] = {
+                "center": noisy_center.tolist(),
+                "extensions": noisy_ext.tolist(),
+                "confidence": min(1.0, confidence)
+            }
+            
+        self.cached_perception = perceived_data
+        return perceived_data

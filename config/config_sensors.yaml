@@ -1,3 +1,13 @@
-fov_angle: 90.0
-# max_range: 15.0
+# Geometric Settings (Frustum)
+fov_horizontal: 90.0
+fov_vertical: 60.0
 max_range: 0.0 # 0.0 means no limit
+
+# Probabilistic Settings (Noisy Perception)
+noise_pos_std_dev: 0.05         # Average Positioning Error (e.g., 5cm)
+noise_ext_std_dev: 0.02         # Average Error on Bounding Box Dimensions
+noise_conf_std_dev: 0.05 
+min_confidence_threshold: 0.40  # Threshold Below Which Object is Discarded (False Negative)
+update_frequency_hz: 10.0       # Sensor Update Frequency (10 Hz by default)
+noise_pos_base_std: 0.005       # Base Standard Deviation for Position Noise (5mm)
+noise_pos_max_std: 0.30         # Maximum Standard Deviation for Position Noise (30cm)

@@ -4,7 +4,7 @@ from direct.task import Task
 
 from core_types import PerceptionInput
 from world_state import WorldState
-from perception_system import FrustumPerceptionSystem
+from perception_system import NoisyPerceptionSystem
 from spatial_reasoner import GroundTruthSpatialReasoner
 from graphic_engine import GraphicEngine
 from controllers import KeyboardController
@@ -32,7 +32,7 @@ class SimulationCoordinator:
         self.tracker = GraphTracker()
         
         # 2. Dependency Injection / Concrete Strategies
-        self.perception = FrustumPerceptionSystem(sensor_config)
+        self.perception = NoisyPerceptionSystem(sensor_config) # Perception system with noise simulation
         self.spatial_reasoner = GroundTruthSpatialReasoner()
         self.controller = KeyboardController(controller_config)
         self.graphics = GraphicEngine(view_config, sensor_config)
@@ -55,13 +55,15 @@ class SimulationCoordinator:
 
     def tick(self, task):
         dt = self.graphics.taskMgr.globalClock.getDt()
-        
+        current_time = self.graphics.taskMgr.globalClock.getFrameTime()
+
         # 1. Populate untyped input buffer (ROS Topic equivalent)
         inputs = PerceptionInput(
             raw_inputs=self.graphics.poll_inputs(),
             agent_state=self.world.get_agent_state(),
             world_objects=self.world.get_objects(),
-            collision_queue=self.graphics.cHandler
+            collision_queue=self.graphics.cHandler,
+            timestamp=current_time
         )
         
         # 2. Controller
@@ -71,7 +73,9 @@ class SimulationCoordinator:
         self.world.apply_command(command, dt)
         
         # 4. Perception & Reasoning
-        perceived_ids = self.perception.scan_environment(inputs)
+        perceived_objects = self.perception.scan_environment(inputs)
+        
+        perceived_ids = list(perceived_objects.keys())
         semantic_state = self.spatial_reasoner.compute_relations(perceived_ids, inputs)
         
         # 5. Graph Topology 
@@ -80,8 +84,7 @@ class SimulationCoordinator:
         # 6. Render
         self.graphics.update_render(
             self.world.get_agent_state(),
-            self.world.get_objects(),
-            perceived_ids
+            perceived_objects
         )
         
         return Task.cont

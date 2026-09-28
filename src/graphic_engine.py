@@ -118,23 +118,30 @@ class GraphicEngine(ShowBase):
             center = data["center"]
             hx, hy, hz = data["extensions"]
             color = data["color"]
-            gray_val = sum(color[:3]) / 3.0
             
-            # 1. Root Node positioned exactly on the "center" of the object
+            # 1. Root Node for the object, positioned at the center of the AABB
             obj_root = NodePath(f"root_{obj_id}")
             obj_root.reparentTo(self.render)
             obj_root.setPos(*center)
             
-            # 2. Visual Model (The default box starts at 0,0,0 and reaches 1,1,1)
-            # We scale it to reflect the total dimensions (extents * 2)
-            # We translate it negatively to center it perfectly in the Root Node
-            model = self.loader.loadModel("models/box")
-            model.reparentTo(obj_root)
-            model.setScale(hx * 2, hy * 2, hz * 2)
-            model.setPos(-hx, -hy, -hz)
-            model.setTextureOff(1)
+            # 2. Ghost Model (Transparent, locked on the Ground Truth)
+            ghost_model = self.loader.loadModel("models/box")
+            ghost_model.reparentTo(obj_root)
+            ghost_model.setScale(hx * 2, hy * 2, hz * 2)
+            ghost_model.setPos(-hx, -hy, -hz) # Centers the ghost model on the root
+            ghost_model.setColor(LColor(0.5, 0.5, 0.5, 0.3)) # Semi-transparent gray
+            ghost_model.setTransparency(TransparencyAttrib.MAlpha)
+            ghost_model.setTextureOff(1)
             
-            # 3. Physical Model (CollisionBox is centered locally by default at (0,0,0) of its parent node)
+            # 3. Solid Model (Noisy Perception)
+            # Locked to self.render for using absolute coordinates without going crazy with deltas
+            solid_model = self.loader.loadModel("models/box")
+            solid_model.reparentTo(self.render)
+            solid_model.setColor(LColor(*color))
+            solid_model.setTextureOff(1)
+            solid_model.hide() # Hidden until the camera sees it
+            
+            # 4. Collision Model (Based on the AABB, used for broad-phase detection)
             c_box = CollisionBox(Point3(0, 0, 0), hx, hy, hz)
             c_node = CollisionNode(f"physics_{obj_id}")
             c_node.addSolid(c_box)
@@ -144,24 +151,36 @@ class GraphicEngine(ShowBase):
             c_path = obj_root.attachNewNode(c_node)
             c_path.setTag("obj_id", obj_id)
             
+            # Saving references to the models for later updates
             self.render_nodes[obj_id] = {
-                "node": model,
-                "color_on": LColor(*color),
-                "color_off": LColor(gray_val, gray_val, gray_val, color[3])
+                "ghost": ghost_model,
+                "solid": solid_model
             }
 
-    def update_render(self, agent_state, world_objects, perceived_objects):
+    def update_render(self, agent_state, perceived_objects):
         self.cTrav.traverse(self.render)
         self.agent_node.setPos(*agent_state.position)
         self.agent_node.setH(agent_state.yaw)
         self.camera.setP(agent_state.pitch)
         self.camera.setPos(0, 0, 2)
 
-        for obj_id, render_data in self.render_nodes.items():
+        for obj_id, nodes in self.render_nodes.items():
+            solid_node = nodes["solid"]
+
             if obj_id in perceived_objects:
-                render_data["node"].setColor(render_data["color_on"])
+                solid_node.show()
+                
+                # Extract the perceived data for the object (noisy perception)
+                p_data = perceived_objects[obj_id]
+                cx, cy, cz = p_data["center"]
+                px, py, pz = p_data["extensions"]
+                
+                # Application of the distorted parameters
+                solid_node.setScale(px * 2, py * 2, pz * 2) 
+                # We report the correct center by compensating for the origin of the Panda3D model
+                solid_node.setPos(cx - px, cy - py, cz - pz)
             else:
-                render_data["node"].setColor(render_data["color_off"])
+                solid_node.hide()
 
     def setup_input_listeners(self):
         for key in self.raw_inputs["keys"].keys():
