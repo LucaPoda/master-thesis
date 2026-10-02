@@ -272,3 +272,16 @@ def save_generated_map(config_dict: dict, root_path: Path) -> str:
         yaml.dump(config_dict, f, sort_keys=False)
         
     return run_id
+
+def generate_room_coverage(room_bounds):
+    waypoints = []
+    # Simplified lawnmower pattern generation
+    for x in range(int(room_bounds.min_x), int(room_bounds.max_x), 2):
+        for y in range(int(room_bounds.min_y), int(room_bounds.max_y), 2):
+            # 1. Move to position
+            waypoints.append({'x': x, 'y': y, 'z': 1.50, 'yaw': 0, 'pitch': 0, 'type': 'move'})
+            # 2. Execute sweeping scan
+            for yaw in range(0, 360, 45):
+                waypoints.append({'x': x, 'y': y, 'z': 1.50, 'yaw': yaw, 'pitch': -30, 'type': 'scan'})
+                waypoints.append({'x': x, 'y': y, 'z': 1.50, 'yaw': yaw, 'pitch': 45, 'type': 'scan'})
+    return waypoints

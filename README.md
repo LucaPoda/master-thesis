@@ -69,6 +69,25 @@ Execute the main entry point from the project root directory:
 python src/main.py
 ```
 
+**Simulation CLI Arguments**
+The script supports arguments to orchestrate map loading and deterministic trajectory execution. 
+
+**Map Selection & Generation:**
+*   `--default`: Force loading of the base `config_map.yaml`.
+*   `--random`: Generate a new procedural map.
+    *   `--level <int>`: Set complexity level for procedural generation (default: 1).
+    *   `--rooms <int>`: Set the number of rooms to generate (default: 1).
+*   `--run <string>`: Load a specific historical run (e.g., `--run run_20260928_231215`).
+*   *Note: Running without any map arguments will automatically resume the most recently executed run.*
+
+**Trajectory & Execution Modes:**
+*   `--record`: Log manual keyboard/mouse inputs into a trajectory JSON file inside the active run's log directory.
+*   `--replay <path>`: Load a JSON trajectory file to drive the agent deterministically frame-by-frame for reproducible debugging.
+*   `--auto`: Engage the automated planner to explore the current map room-by-room using a rigid boustrophedon sweep.
+
+**Telemetry Pipeline:**
+During execution, the simulation automatically writes a decoupled data stream containing both the engine ground truth and the agent's internal noisy state. This data is exported at a fixed frequency to `telemetry.jsonl` in the active log directory.
+
 ### 3. Opening the Web Visualizer
 
 Upon starting the simulation, the integrated web server listens on http://127.0.0.1:8000.

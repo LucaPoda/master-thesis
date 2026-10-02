@@ -8,3 +8,5 @@
 *   **Procedural Map Generation**: The algorithmic creation of structured 3D environments (rooms, walls, furniture) with varying density and complexity to stress-test spatial reasoning algorithms without relying on hardcoded layouts.
 *   **SimulationCoordinator**: The root application composer responsible for dependency injection, configuration loading, and orchestrating the execution order of the simulation loop.
 *   **Noisy Perception**: Simulated visual data that mimics real-world sensor imperfections, incorporating update frequency caps, distance-based quadratic spatial deviations (Gaussian noise), and false negatives based on confidence thresholds.
+*   **OdometrySystem**: A decoupled perception module that simulates hardware movement sensors (IMU/encoders) by injecting drift and Gaussian noise into the physical ground truth deltas to maintain the agent's flawed "believed state".
+*   **TelemetryLogger**: A decoupled data pipeline that captures and exports time-series JSONL data comparing the engine's absolute ground truth with the agent's noisy internal state for comparative analysis.

@@ -4,5 +4,6 @@ PyYAML>=6.0
 fastapi>=0.100.0
 uvicorn>=0.22.0
 websockets>=11.0
+jsonlines>=3.0
 
 pytest-cov

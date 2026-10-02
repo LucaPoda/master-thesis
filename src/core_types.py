@@ -1,3 +1,4 @@
+# src/core_types.py
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Any, Set
@@ -13,6 +14,14 @@ class AgentState:
         rad = np.radians(self.yaw)
         # In Panda3D standard, forward is on the Y axis.
         return np.array([-np.sin(rad), np.cos(rad), 0.0])
+
+    def to_dict(self) -> dict:
+        """Converts the state to a JSON-serializable dictionary."""
+        return {
+            "position": self.position.tolist() if isinstance(self.position, np.ndarray) else list(self.position),
+            "yaw": self.yaw,
+            "pitch": self.pitch
+        }
 
 @dataclass
 class MovementCommand:
@@ -36,6 +45,13 @@ class SemanticState:
         # Convert relations to explicit tuples (subject, relation, target) to guarantee absolute hash divergence
         rel_tuples = [(r.subject, r.relation, r.target) for r in self.relations]
         return frozenset(list(self.visible_objects) + rel_tuples)
+
+@dataclass
+class RoomBounds:
+    min_x: int
+    max_x: int
+    min_y: int
+    max_y: int
 
 class PerceptionInput:
     """

@@ -6,6 +6,7 @@ We have successfully transitioned the architecture from its initial deterministi
 1. **Procedural Generation:** We moved away from static configurations. The `MapGenerator` allows us to instantly create and persist dynamic environments, ensuring our topological reasoning handles edge cases and unpredictable clutter.
 2. **Perception Uncertainty:** The `NoisyPerceptionSystem` successfully mimics real-world hardware limitations. By introducing distance-scaled Gaussian noise, artificial delays (update frequencies), and false negatives via confidence dropouts, we've broken the "perfect vision" assumption.
 3. **Centralized Coordination:** The `SimulationCoordinator` handles dependency injection, making it trivial to swap between idealized components and realistic, noisy equivalents for A/B testing.
+4. **Deterministic Replay & Telemetry:** We successfully decoupled kinematic controllers from noisy internal state. The introduction of the `OdometrySystem` and `TelemetryLogger`, alongside `ReplayController`, allows us to record manual trajectories and replay them deterministically while safely exporting the divergence between ground truth and believed state.
 
 ## Next Steps: Handling Ambiguity
 

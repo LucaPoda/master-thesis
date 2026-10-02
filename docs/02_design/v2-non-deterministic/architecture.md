@@ -11,10 +11,13 @@ Acts as a generic subscriber payload populated by the coordinator. Concrete perc
 ## Core Pipelines
 1. **`MapGenerator`**: Procedurally generates environments from random scatterings (Level 0) up to complex, multi-room structures with hung objects and furniture (Level 3).
 2. **`WorldState`**: Ground-truth definition of the 3D map environment and physics tracking.
-3. **`GraphicEngine`**: Panda3D visualizer running broad-phase collision detection.
-4. **`PerceptionSystem`**: 
+3. **`Controllers`**: Handles execution of movement commands through decoupled modules: `KeyboardController` (manual), `RecordingKeyboardController` (manual + serialization), `ReplayController` (deterministic playback), and `TrajectoryController` (automatic waypoints).
+4. **`GraphicEngine`**: Panda3D visualizer running broad-phase collision detection.
+5. **`PerceptionSystem`**: 
    *   *Frustum Base*: Simulates optical camera vision using 6-plane Frustum Culling.
    *   *Noisy Implementation*: Mimics real-world hardware by caching data to simulate lower update frequencies, injecting distance-scaled quadratic Gaussian noise, and deliberately dropping objects below confidence thresholds.
+   *   *OdometrySystem*: Simulates internal IMU/encoder drift to generate the agent's believed state independently from the kinematic controllers.
+6. **`TelemetryLogger`**: Asynchronously logs internal state vs. ground truth to disk at a fixed frequency for post-run analysis.
 
 ## Ego-Centric Spatial Reasoning (`spatial_reasoner.py`)
 Currently performs relational inference in the **Agent's Camera Frame**. Objects are projected into relative coordinates based on the agent's Yaw.

@@ -1,11 +1,12 @@
 # TODO / Next Steps
 
 ## 1. Architecture Preparation (Testing & Baselines)
-- [ ] **Record & Replay Trajectories:** Implement a system to record keyboard movements during a live run and replay them automatically. This avoids the overhead of building a motion planner while ensuring reproducible trajectories for comparative testing.
+- [x] **Record & Replay Trajectories:** Implement a system to record keyboard movements during a live run and replay them automatically. This avoids the overhead of building a motion planner while ensuring reproducible trajectories for comparative testing.
+- [ ] **Fix Automatic Mode:** Fix the automatic mode (`TrajectoryController`) which is currently not working (deferred for now).
 - [ ] **Edge Odometry Tracking:** Update the graph edge creation to record the relative 6-axis displacement (position and orientation) between one node and the next. 
-- [ ] **Noisy Perception Node:** Create a new perception component that introduces artificial error/noise for both object perception and movement tracking, leaving the current ground truth pipeline intact for comparison.
-- [ ] **Ghost Ground Truth Visualization:** Update the Panda3D engine to render perceived objects as solid blocks, while rendering the actual ground truth objects as transparent "ghosts" (similar to racing game ghosts) for visual debugging.
-- [ ] **Diff. Analysis":** when we generate a node in the graph with the noisy perception we check how it should have been using the ground truth, we say the differences and we publish them to the visualizer for showing them in the sidebar 
+- [x] **Noisy Perception Node:** Create a new perception component that introduces artificial error/noise for both object perception and movement tracking, leaving the current ground truth pipeline intact for comparison.
+- [x] **Ghost Ground Truth Visualization:** Update the Panda3D engine to render perceived objects as solid blocks, while rendering the actual ground truth objects as transparent "ghosts" (similar to racing game ghosts) for visual debugging.
+- [ ] **Diff. Analysis":** when we generate a node in the graph with the noisy perception we check how it should have been using the ground truth, we say the differences and we publish them to the visualizer for showing them in the sidebar.
 - [ ] **Extract Baseline Metrics:** Run the recorded trajectories with the noisy perception node and extract baseline performance metrics *before* introducing any Bayesian inference.
 
 ## 2. Probabilistic Reasoning & Literature
