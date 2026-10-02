@@ -1,12 +1,16 @@
 # Roadmap & Architectural Reflections
-We have just finalized the first version of the architecture (`v1_deterministic`). This initial phase relies heavily on idealized assumptions: perfect geometric perception ("ground truth") and strictly deterministic state transitions.
 
-However, the entire component-based system—particularly the use of the flexible `PerceptionInput` buffer—has been designed and structured to accommodate future versions that will progressively relax these initial assumptions.
+We have successfully transitioned the architecture from its initial deterministic state (`v1`) to a more robust, probabilistic setup (`v2`). 
 
-## Towards a Realistic Use Case
+## Recent Achievements
+1. **Procedural Generation:** We moved away from static configurations. The `MapGenerator` allows us to instantly create and persist dynamic environments, ensuring our topological reasoning handles edge cases and unpredictable clutter.
+2. **Perception Uncertainty:** The `NoisyPerceptionSystem` successfully mimics real-world hardware limitations. By introducing distance-scaled Gaussian noise, artificial delays (update frequencies), and false negatives via confidence dropouts, we've broken the "perfect vision" assumption.
+3. **Centralized Coordination:** The `SimulationCoordinator` handles dependency injection, making it trivial to swap between idealized components and realistic, noisy equivalents for A/B testing.
 
-The goal of upcoming iterations is to bring the simulator closer to the real-world operating conditions of autonomous robotics and computer vision. The main areas of focus will be:
+## Next Steps: Handling Ambiguity
 
-1. **Moving Beyond Pure Determinism:** We will replace rigid geometric thresholds (e.g., "A is exactly to the left of B") with probabilistic models and confidence intervals. This will allow for the handling of visual noise, camera micro-movements (chattering), and spatial ambiguity.
-2. **Perception Uncertainty:** The `PerceptionSystem` module—currently based on infallible frustum culling against map data—will evolve to simulate noisy sensors, false positives/negatives, or integration with real visual inference models (e.g., YOLO/VLM).
-3. **Active Exploration:** We will shift from manually guided exploration to Active SLAM logic, where the agent must plan its movements to maximize information gain and resolve ambiguities within the semantic graph.
+With noisy perception actively causing visual chattering and spontaneous object disappearance, our semantic mapping logic will break if it expects perfect continuity. The main areas of focus moving forward are:
+
+1. **Robust Temporal Tracking:** The `GraphTracker` must be updated to handle false negatives. If an object drops below the confidence threshold for a split second, the graph should not instantly snap to an entirely new semantic node. We need to introduce memory buffers or hysteresis logic.
+2. **Bayesian State Updates:** Implement a Kalman filter or similar statistical framework. The spatial reasoner needs to update state probabilities by combining the agent's known relative movement (odometry) with the newly fluctuating visual coordinates.
+3. **Active Exploration (SLAM):** Shift from manually guided (keyboard) exploration to autonomous logic. The agent should evaluate the semantic graph for uncertainties and actively plan paths to maximize visual information gain.
