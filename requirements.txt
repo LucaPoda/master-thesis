@@ -5,5 +5,7 @@ fastapi>=0.100.0
 uvicorn>=0.22.0
 websockets>=11.0
 jsonlines>=3.0
+pandas>=2.0.0
+matplotlib>=3.7.0
 
 pytest-cov

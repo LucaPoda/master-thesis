@@ -1,0 +1,17 @@
+ema:
+  alpha: 0.3
+wls:
+  # Incertezza iniziale (P0) e rumore di misurazione (R) statico
+  p_init: 1.0
+  r_noise: 0.5
+kf:
+  # Aggiunge il rumore di processo (Q) per l'odometria
+  p_init: 1.0
+  r_noise: 0.5
+  q_noise: 0.0001
+ekf:
+  # Utilizza un rumore di misurazione dinamico basato sulla distanza (come nel sensore hardware)
+  p_init: 1.0
+  q_noise: 0.0001
+  base_r_std: 0.005
+  max_r_std: 0.30

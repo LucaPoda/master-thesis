@@ -1,16 +1,18 @@
-# src/main.py
 import yaml
 import argparse
 import time
 import jsonlines
 from pathlib import Path
 from direct.task import Task
-import sys
+from panda3d.core import loadPrcFileData
 
-# Core modules
 from core_types import PerceptionInput, RoomBounds
 from world_state import WorldState
-from perception_system import NoisyPerceptionSystem, OdometrySystem
+from perception_system import (
+    NoisyPerceptionSystem, OdometrySystem,
+    ExponentialMovingAverageFilter, WeightedLeastSquaresFilter, 
+    LinearKalmanFilter, ExtendedKalmanFilter
+)
 from spatial_reasoner import GroundTruthSpatialReasoner
 from graphic_engine import GraphicEngine
 from agent_state import GraphTracker
@@ -36,8 +38,11 @@ def parse_arguments_and_setup():
     parser.add_argument("--record", action="store_true", help="Record manual trajectory to JSON")
     parser.add_argument("--replay", type=str, help="Path to trajectory JSON for deterministic playback")
     parser.add_argument("--auto", action="store_true", help="Automated room coverage via TrajectoryController")
+    parser.add_argument("--headless", action="store_true", help="Run without screen rendering")    
     
     args = parser.parse_args()
+    if args.headless:
+        loadPrcFileData("", "window-type offscreen")
 
     root_path = Path(__file__).parent.parent
     config_path = root_path / "config"
@@ -107,16 +112,11 @@ class TelemetryLogger:
         self.file_path = Path(log_dir) / "telemetry.jsonl"
         self.file = jsonlines.open(self.file_path, mode='w')
 
-    def tick(self, gt_state, believed_state, raw_perception, filtered_state=None):
+    def tick(self, payload):
         now = time.time()
         if now - self.last_log_time >= self.interval:
-            self.file.write({
-                "timestamp": now,
-                "ground_truth": gt_state.to_dict() if hasattr(gt_state, 'to_dict') else gt_state.__dict__,
-                "believed_pre_filter": believed_state.to_dict() if hasattr(believed_state, 'to_dict') else believed_state.__dict__,
-                "raw_perception": raw_perception,
-                "believed_post_filter": filtered_state.to_dict() if filtered_state and hasattr(filtered_state, 'to_dict') else None
-            })
+            payload["timestamp"] = now
+            self.file.write(payload)
             self.last_log_time = now
 
 class SimulationCoordinator:
@@ -125,7 +125,9 @@ class SimulationCoordinator:
         sensor_config = load_yaml_config("config_sensors.yaml")
         view_config = load_yaml_config("config_view.yaml")
         controller_config = load_yaml_config("config_controllers.yaml")
-
+        filter_config = load_yaml_config("config_filters.yaml")
+        noise_config = sensor_config.get('odometry', {})
+        
         self.world = WorldState(map_config)
         self.tracker = GraphTracker()
         
@@ -134,72 +136,33 @@ class SimulationCoordinator:
         
         self.perception = NoisyPerceptionSystem(sensor_config)
         self.spatial_reasoner = GroundTruthSpatialReasoner()
-        self.graphics = GraphicEngine(view_config, sensor_config)
-        
-        noise_config = sensor_config.get('odometry', {})
+        self.graphics = GraphicEngine(view_config, sensor_config, headless=args.headless)
         self.odometry = OdometrySystem(noise_config)
         
+        # Inizializzazione Multi-Filtro
+        self.f_ema = ExponentialMovingAverageFilter(filter_config['ema'])
+        self.f_wls = WeightedLeastSquaresFilter(filter_config['wls'])
+        self.f_kf = LinearKalmanFilter(filter_config['kf'])
+        self.f_ekf = ExtendedKalmanFilter(filter_config['ekf'])
+
         if args.replay:
-            print(f"Initializing ReplayController with: {args.replay}")
             self.controller = ReplayController(args.replay)
         elif args.auto:
-            print("Initializing TrajectoryController for auto-exploration...")
-            if 'rooms' in map_config and len(map_config['rooms']) > 0:
-                raw_bounds = map_config['rooms'][0]['bounds']
-            else:
-                objects = map_config.get("objects", {})
-                if objects:
-                    min_x = min([obj["center"][0] for obj in objects.values()])
-                    max_x = max([obj["center"][0] for obj in objects.values()])
-                    min_y = min([obj["center"][1] for obj in objects.values()])
-                    max_y = max([obj["center"][1] for obj in objects.values()])
-                else:
-                    world_size = map_config.get('world_size', [50, 50, 1])
-                    min_x, max_x = -world_size[0]/2, world_size[0]/2
-                    min_y, max_y = -world_size[1]/2, world_size[1]/2
-
-                # Compute bounded perimeter padding
-                raw_bounds = {'min_x': min_x + 2, 'max_x': max_x - 2, 'min_y': min_y + 2, 'max_y': max_y - 2}
-
-            room_bounds = RoomBounds(
-                min_x=int(raw_bounds['min_x']), max_x=int(raw_bounds['max_x']), 
-                min_y=int(raw_bounds['min_y']), max_y=int(raw_bounds['max_y'])
-            )
-            waypoints = generate_room_coverage(room_bounds)
-            print(f"Generated {len(waypoints)} scanning waypoints.")
-            self.controller = TrajectoryController(waypoints)
+            world_size = map_config.get('world_size', [50, 50, 1])
+            rb = RoomBounds(min_x=0, max_x=world_size[0], min_y=0, max_y=world_size[1])
+            self.controller = TrajectoryController(generate_room_coverage(rb))
         else:
-            base_ctrl = KeyboardController(controller_config)
-            if args.record:
-                print(f"Initializing RecordingKeyboardController. Logs will save to {log_dir}")
-                self.controller = RecordingKeyboardController(base_ctrl, log_dir)
-            else:
-                self.controller = base_ctrl
-        
-        dynamic_colors = {}
-        for obj_id, obj_data in self.world.get_objects().items():
-            r, g, b, a = obj_data["color"]
-            dynamic_colors[obj_id] = f"rgba({int(r*255)}, {int(g*255)}, {int(b*255)}, {a})"
-            
-        self.bridge = GraphVisualizerBridge(
-            tracker=self.tracker, 
-            config_colors=dynamic_colors
-        )
-        self.bridge.start()
-        
+            base_ctrl = KeyboardController(controller_config) # Fixata la chiamata alla lambda inesistente
+            self.controller = RecordingKeyboardController(base_ctrl, log_dir) if args.record else base_ctrl
+
         self.graphics.initialize_world_graphics(self.world.get_objects())
         self.graphics.taskMgr.add(self.tick, "main_simulation_loop")
 
     def tick(self, task):
         dt = self.graphics.taskMgr.globalClock.getDt()
-        current_time = self.graphics.taskMgr.globalClock.getFrameTime()
-
         inputs = PerceptionInput(
-            raw_inputs=self.graphics.poll_inputs(),
-            agent_state=self.world.get_agent_state(),
-            world_objects=self.world.get_objects(),
-            collision_queue=self.graphics.cHandler,
-            timestamp=current_time
+            raw_inputs=self.graphics.poll_inputs(), agent_state=self.world.get_agent_state(),
+            world_objects=self.world.get_objects(), collision_queue=self.graphics.cHandler, timestamp=time.time()
         )
         
         command = self.controller.get_command(inputs, dt)
@@ -207,33 +170,39 @@ class SimulationCoordinator:
         gt_state = self.world.get_agent_state()
         believed_state = self.odometry.estimate(gt_state, dt)
         
-        perceived_objects = self.perception.scan_environment(inputs)
-        perceived_ids = list(perceived_objects.keys())
-        semantic_state = self.spatial_reasoner.compute_relations(perceived_ids, inputs)
+        raw_perception = self.perception.scan_environment(inputs)
         
+        # Pipeline Comparativa Multi-Filtro
+        out_ema = self.f_ema.update(raw_perception, believed_state, dt)
+        out_wls = self.f_wls.update(raw_perception, believed_state, dt)
+        out_kf = self.f_kf.update(raw_perception, believed_state, dt)
+        out_ekf = self.f_ekf.update(raw_perception, believed_state, dt)
+        
+        # Utilizza l'EKF (Gold Standard) per il ragionamento topologico
+        semantic_state = self.spatial_reasoner.compute_relations(list(out_ekf.keys()), inputs)
         self.tracker.update_state(semantic_state)
         
-        self.logger.tick(
-            gt_state=gt_state, 
-            believed_state=believed_state, 
-            raw_perception=perceived_objects,
-            filtered_state=None
-        )
+        # Esporta lo stream parallelo di tutti gli stimatori
+        self.logger.tick({
+            "ground_truth": gt_state.to_dict() if hasattr(gt_state, 'to_dict') else gt_state.__dict__,
+            "believed_pre_filter": believed_state.to_dict() if hasattr(believed_state, 'to_dict') else believed_state.__dict__,
+            "raw_perception": raw_perception,
+            "ema_perception": out_ema,
+            "wls_perception": out_wls,
+            "kf_perception": out_kf,
+            "ekf_perception": out_ekf
+        })
         
-        self.graphics.update_render(gt_state, perceived_objects)
+        self.graphics.update_render(gt_state, out_ekf)
         return Task.cont
 
     def run(self):
         try:
             self.graphics.run()
         finally:
-            if hasattr(self.controller, 'save'):
-                print("Saving recorded trajectory...")
-                self.controller.save()
-            if hasattr(self.logger, 'file'):
-                self.logger.file.close()
+            if hasattr(self.controller, 'save'): self.controller.save()
+            if hasattr(self.logger, 'file'): self.logger.file.close()
 
 if __name__ == "__main__":
-    args, selected_map, log_dir = parse_arguments_and_setup()
-    sim = SimulationCoordinator(args, selected_map, log_dir)
-    sim.run()
+    args, map_f, log_d = parse_arguments_and_setup()
+    SimulationCoordinator(args, map_f, log_d).run()

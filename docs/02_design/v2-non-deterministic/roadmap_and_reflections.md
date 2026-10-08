@@ -15,3 +15,11 @@ With noisy perception actively causing visual chattering and spontaneous object 
 1. **Robust Temporal Tracking:** The `GraphTracker` must be updated to handle false negatives. If an object drops below the confidence threshold for a split second, the graph should not instantly snap to an entirely new semantic node. We need to introduce memory buffers or hysteresis logic.
 2. **Bayesian State Updates:** Implement a Kalman filter or similar statistical framework. The spatial reasoner needs to update state probabilities by combining the agent's known relative movement (odometry) with the newly fluctuating visual coordinates.
 3. **Active Exploration (SLAM):** Shift from manually guided (keyboard) exploration to autonomous logic. The agent should evaluate the semantic graph for uncertainties and actively plan paths to maximize visual information gain.
+
+## The Allocentric Paradox & Egocentric SLAM (October 2026)
+
+Following the implementation of our multi-filter evaluation pipeline (EMA, WLS, KF, EKF), telemetry analysis revealed that the Weighted Least Squares (WLS) estimator vastly outperformed the Extended Kalman Filter. 
+
+This paradox exposed a crucial shortcut in our current perception model: the `NoisyPerceptionSystem` currently outputs absolute, allocentric coordinates. Because the world's landmarks are static, applying zero-mean Gaussian noise directly to their absolute positions makes WLS the mathematically optimal estimator (MVUE). The Kalman Filters failed to converge because their process noise matrices ($Q$) assume a dynamic state, causing them to "chase" the measurement noise.
+
+To build an authentic SLAM system, the perception node must be refactored to output strictly egocentric data (range and bearing). A robot does not perceive absolute coordinates; it perceives relative distances from a drifting pose. Once perception is relative to a noisy odometry frame, WLS will fail, and the EKF—utilizing non-linear Jacobians to fuse local vision with dead-reckoning—will become strictly necessary to map the Semantic Scene Graph.

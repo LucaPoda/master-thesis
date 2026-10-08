@@ -14,20 +14,27 @@ from panda3d.core import (
 )
 
 class GraphicEngine(ShowBase):
-    def __init__(self, view_config, sensor_config):
+    def __init__(self, view_config, sensor_config, headless=False):
+        if headless:
+            loadPrcFileData("", "window-type offscreen")
+            
         super().__init__()
         
-        # Window and Input Setup
         props = WindowProperties()
         props.setTitle(view_config["window_title"])
-        self.win.requestProperties(props)
+        if not headless:
+            self.win.requestProperties(props)
+            self.accept("mouse1", self.lock_mouse)
+            self.accept("escape", self.unlock_mouse)
+            
         self.disableMouse()
         self.camLens.setFov(view_config["global_fov"])
         self.mouse_locked = False
-        self.accept("mouse1", self.lock_mouse)
-        self.accept("escape", self.unlock_mouse)
+        self.headless = headless
+        
         self.raw_inputs = {"keys": {k: False for k in ["w", "a", "s", "d", "space", "lshift"]}, "mouse_dx": 0, "mouse_dy": 0}
-        self.setup_input_listeners()
+        if not headless:
+            self.setup_input_listeners()
         
         # Hierarchy and Rendering Setup
         self.render_nodes = {}

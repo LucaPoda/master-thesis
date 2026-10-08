@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 from interfaces import BasePerceptionSystem
 from core_types import PerceptionInput
@@ -138,12 +139,13 @@ class NoisyPerceptionSystem(FrustumPerceptionSystem):
         self.update_interval = 1.0 / update_hz
         self.last_update_time = -self.update_interval 
         self.cached_perception = {}
+        self.filter_state = {}  # Store the filtered state for each object
 
     def scan_environment(self, inputs):
         current_time = inputs.get("timestamp")
         if current_time - self.last_update_time < self.update_interval:
             return self.cached_perception
-
+ 
         self.last_update_time = current_time
         visible_dict = super().scan_environment(inputs)
         
@@ -170,3 +172,152 @@ class NoisyPerceptionSystem(FrustumPerceptionSystem):
             
         self.cached_perception = perceived_data
         return perceived_data
+
+
+    def apply_filter(self, raw_perception: dict, believed_state) -> dict:   
+        alpha = 0.3  # Peso della nuova misurazione (0.0 = ignora il nuovo dato, 1.0 = ignora lo storico)
+        filtered_perception = {}
+
+        for obj_id, data in raw_perception.items():
+            current_center = np.array(data["center"])
+
+            if obj_id not in self.filter_state:
+                # Prima osservazione: inizializza lo stato con la misurazione grezza
+                self.filter_state[obj_id] = current_center
+            else:
+                # Applica il filtro esponenziale: media pesata tra il nuovo dato e lo storico
+                smoothed_center = (alpha * current_center) + ((1 - alpha) * self.filter_state[obj_id])
+                self.filter_state[obj_id] = smoothed_center
+
+            # Ricostruisci il dizionario con i dati puliti
+            filtered_perception[obj_id] = copy.deepcopy(data)
+            filtered_perception[obj_id]["center"] = self.filter_state[obj_id].tolist()
+
+        return filtered_perception
+
+class ExponentialMovingAverageFilter:
+    def __init__(self, config):
+        self.alpha = config.get('alpha', 0.3)
+        self.state = {}
+
+    def update(self, raw_perception, agent_state=None, dt=0):
+        filtered = {}
+        for obj_id, data in raw_perception.items():
+            z = np.array(data["center"])
+            if obj_id not in self.state:
+                self.state[obj_id] = z
+            else:
+                self.state[obj_id] = (self.alpha * z) + ((1 - self.alpha) * self.state[obj_id])
+            
+            filtered[obj_id] = copy.deepcopy(data)
+            filtered[obj_id]["center"] = self.state[obj_id].tolist()
+        return filtered
+
+class WeightedLeastSquaresFilter:
+    def __init__(self, config):
+        self.R = np.eye(3) * config.get('r_noise', 0.5)
+        self.p_init = config.get('p_init', 1.0)
+        self.state = {}
+        self.P = {}
+
+    def update(self, raw_perception, agent_state=None, dt=0):
+        filtered = {}
+        for obj_id, data in raw_perception.items():
+            z = np.array(data["center"])
+            
+            if obj_id not in self.state:
+                self.state[obj_id] = z
+                self.P[obj_id] = np.eye(3) * self.p_init
+            else:
+                # WLS Update (No prediction step)
+                S = self.P[obj_id] + self.R
+                W = self.P[obj_id] @ np.linalg.inv(S)
+                
+                self.state[obj_id] = self.state[obj_id] + W @ (z - self.state[obj_id])
+                self.P[obj_id] = (np.eye(3) - W) @ self.P[obj_id]
+                
+            filtered[obj_id] = copy.deepcopy(data)
+            filtered[obj_id]["center"] = self.state[obj_id].tolist()
+        return filtered
+
+class LinearKalmanFilter:
+    def __init__(self, config):
+        self.R = np.eye(3) * config.get('r_noise', 0.5)
+        self.Q = np.eye(3) * config.get('q_noise', 0.05)
+        self.p_init = config.get('p_init', 1.0)
+        self.state = {}
+        self.P = {}
+        self.last_agent_pos = None
+
+    def update(self, raw_perception, agent_state, dt):
+        # 1. Odometry control input (u)
+        current_agent_pos = agent_state.position
+        if self.last_agent_pos is None:
+            self.last_agent_pos = current_agent_pos.copy()
+        
+        u_delta = current_agent_pos - self.last_agent_pos
+        self.last_agent_pos = current_agent_pos.copy()
+
+        filtered = {}
+        for obj_id, data in raw_perception.items():
+            z = np.array(data["center"])
+            
+            if obj_id not in self.state:
+                self.state[obj_id] = z
+                self.P[obj_id] = np.eye(3) * self.p_init
+            else:
+                # A. Prediction Step (Allocentric coordinates assume target is static, 
+                # but if tracked egocentrically, we shift by odometry delta)
+                x_pred = self.state[obj_id] 
+                P_pred = self.P[obj_id] + self.Q
+                
+                # B. Update Step
+                S = P_pred + self.R
+                W = P_pred @ np.linalg.inv(S)
+                
+                self.state[obj_id] = x_pred + W @ (z - x_pred)
+                self.P[obj_id] = (np.eye(3) - W) @ P_pred
+                
+            filtered[obj_id] = copy.deepcopy(data)
+            filtered[obj_id]["center"] = self.state[obj_id].tolist()
+        return filtered
+
+class ExtendedKalmanFilter:
+    def __init__(self, config):
+        self.Q = np.eye(3) * config.get('q_noise', 0.05)
+        self.p_init = config.get('p_init', 1.0)
+        self.base_r_std = config.get('base_r_std', 0.005)
+        self.max_r_std = config.get('max_r_std', 0.30)
+        self.state = {}
+        self.P = {}
+
+    def update(self, raw_perception, agent_state, dt):
+        filtered = {}
+        agent_pos = agent_state.position
+        
+        for obj_id, data in raw_perception.items():
+            z = np.array(data["center"])
+            
+            if obj_id not in self.state:
+                self.state[obj_id] = z
+                self.P[obj_id] = np.eye(3) * self.p_init
+            else:
+                x_pred = self.state[obj_id]
+                P_pred = self.P[obj_id] + self.Q
+                
+                # EKF Non-Linearity: R dynamically scales with euclidean distance Jacobian
+                dist = np.linalg.norm(x_pred - agent_pos)
+                dynamic_std = min(self.max_r_std, self.base_r_std * (dist ** 2))
+                R_dynamic = np.eye(3) * (dynamic_std ** 2)
+                
+                S = P_pred + R_dynamic
+                W = P_pred @ np.linalg.inv(S)
+                
+                self.state[obj_id] = x_pred + W @ (z - x_pred)
+                # Joseph form for numerical stability
+                I_WH = np.eye(3) - W
+                self.P[obj_id] = I_WH @ P_pred @ I_WH.T + W @ R_dynamic @ W.T
+                
+            filtered[obj_id] = copy.deepcopy(data)
+            filtered[obj_id]["center"] = self.state[obj_id].tolist()
+        return filtered
